@@ -4,7 +4,7 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        <style dangerouslySetInnerHTML={{ __html: `body{margin:0}` }} />
+        <style dangerouslySetInnerHTML={{ __html: `html,body{margin:0;height:100%}` }} />
       </Head>
       <body>
         <Main />
