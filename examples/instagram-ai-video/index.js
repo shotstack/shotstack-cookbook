@@ -1,33 +1,59 @@
-import 'dotenv/config';
+import { pathToFileURL } from 'node:url';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 const INGEST_BASE = 'https://api.shotstack.io/ingest/v1';
-const INGEST_HEADERS = { 'x-api-key': process.env.SHOTSTACK_API_KEY };
-
 const EDIT_BASE = 'https://api.shotstack.io/edit/v1';
-const EDIT_HEADERS = {
-  'x-api-key': process.env.SHOTSTACK_API_KEY,
-  'Content-Type': 'application/json',
-};
+const IG_BASE = 'https://graph.facebook.com/v25.0';
 
 const VIDEO_DURATION = 20; // seconds — matches the 15-20s script target
 
+// Shotstack has no system fonts installed, so the family has to be loaded from a
+// URL. The family name is the file basename: they must match or the font won't load.
+const FONT_SRC =
+  'https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm45xW5rygbi49c.ttf';
+const FONT_FAMILY = 'JTUSjIg1_i6t8kCHKm45xW5rygbi49c';
+
+const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2';
+
+// Constructed on first use: the client throws if the key is missing, and we want
+// the friendlier requireEnv message to fire first.
+let openaiClient;
+const openai = () =>
+  (openaiClient ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY }));
+
+const ingestHeaders = () => ({ 'x-api-key': process.env.SHOTSTACK_API_KEY });
+const editHeaders = () => ({
+  'x-api-key': process.env.SHOTSTACK_API_KEY,
+  'Content-Type': 'application/json',
+});
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function requireEnv(keys) {
+  const missing = keys.filter((key) => !process.env[key]);
+  if (missing.length) {
+    throw new Error(
+      `Missing environment variables: ${missing.join(', ')}\n` +
+        'Copy .env.example to .env and fill in your keys.',
+    );
+  }
+}
+
 async function generateContent(topic) {
-  const response = await openai.chat.completions.create({
+  const response = await openai().chat.completions.create({
     model: 'gpt-5-nano',
     messages: [
       {
         role: 'system',
         content: `You are a social media content writer. Return JSON only, no markdown.
-Schema: { "script": string, "caption": string }
+Schema: { "script": string, "hook": string, "caption": string }
 - script: a 15-20 second voiceover narration (~40 words), punchy and direct
+- hook: the on-screen title, under 60 characters
 - caption: under 75 characters with 2-3 relevant hashtags`,
       },
       {
         role: 'user',
-        content: `Write a script and caption for an Instagram Reel about: ${topic}`,
+        content: `Write a script, hook and caption for an Instagram Reel about: ${topic}`,
       },
     ],
     response_format: { type: 'json_object' },
@@ -59,9 +85,8 @@ async function generateVoiceover(script) {
 }
 
 async function generateBackground(topic) {
-  const model = process.env.OPENAI_IMAGE_MODEL;
-  const result = await openai.images.generate({
-    model,
+  const result = await openai().images.generate({
+    model: IMAGE_MODEL,
     prompt: `Cinematic vertical background image for an Instagram Reel about: ${topic}.
 Bold colors, visually striking, no text, no people. Designed for 9:16 portrait format.`,
     size: '1024x1536',
@@ -75,7 +100,7 @@ async function uploadToShotstack(buffer, contentType) {
   // 1. Request a signed upload URL
   const uploadRes = await fetch(`${INGEST_BASE}/upload`, {
     method: 'POST',
-    headers: { ...INGEST_HEADERS, 'Content-Type': 'application/json' },
+    headers: { ...ingestHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
   if (!uploadRes.ok)
@@ -93,58 +118,59 @@ async function uploadToShotstack(buffer, contentType) {
 
   // 3. Poll until ready (usually a few seconds)
   for (let i = 0; i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 3000));
     const statusRes = await fetch(`${INGEST_BASE}/sources/${sourceId}`, {
-      headers: INGEST_HEADERS,
+      headers: ingestHeaders(),
     });
     const { data: src } = await statusRes.json();
     if (src.attributes.status === 'ready') return src.attributes.source;
     if (src.attributes.status === 'failed')
       throw new Error('Shotstack ingest failed');
+    await sleep(3000);
   }
 
   throw new Error('Shotstack ingest timed out');
 }
 
-function escapeHtml(value) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
 async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
   const edit = {
     timeline: {
-      soundtrack: { src: voiceoverUrl, effect: 'fadeOut' },
+      fonts: [{ src: FONT_SRC }],
+      // tracks[0] is the TOP layer — overlays first, background last.
       tracks: [
         {
-          // Text hook overlay (top layer)
           clips: [
             {
               asset: {
-                type: 'html5',
-                html: `<p>${escapeHtml(hookText)}</p>`,
-                css: `p {
-                  font-family: "Open Sans"; font-size: 42px;
-                  color: white; text-align: center;
-                  text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
-                  padding: 20px;
-                }`,
+                type: 'rich-text',
+                text: hookText,
+                font: {
+                  family: FONT_FAMILY,
+                  size: 54,
+                  weight: '700',
+                  color: '#ffffff',
+                },
+                stroke: { width: 2, color: '#000000' },
+                shadow: {
+                  offsetX: 0,
+                  offsetY: 4,
+                  blur: 12,
+                  color: '#000000',
+                  opacity: 0.6,
+                },
+                align: { horizontal: 'center', vertical: 'middle' },
+                animation: { preset: 'ascend', duration: 0.6, direction: 'up' },
               },
               start: 0,
               length: VIDEO_DURATION,
-              width: 1080,
-              height: 300,
+              // The clip box sets the text wrap width, not the asset.
+              width: 940,
+              height: 400,
               position: 'bottom',
-              offset: { y: 0.15 },
+              offset: { y: 0.15 }, // positive y moves up
             },
           ],
         },
         {
-          // Background image (bottom layer)
           clips: [
             {
               asset: { type: 'image', src: backgroundUrl },
@@ -152,6 +178,15 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
               length: VIDEO_DURATION,
               fit: 'crop',
               effect: 'zoomIn',
+            },
+          ],
+        },
+        {
+          clips: [
+            {
+              asset: { type: 'audio', src: voiceoverUrl, effect: 'fadeOut' },
+              start: 0,
+              length: 'auto',
             },
           ],
         },
@@ -167,18 +202,17 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
 
   const renderRes = await fetch(`${EDIT_BASE}/render`, {
     method: 'POST',
-    headers: EDIT_HEADERS,
+    headers: editHeaders(),
     body: JSON.stringify(edit),
   });
   if (!renderRes.ok)
     throw new Error(`Shotstack render submit failed: ${renderRes.status}`);
   const { response } = await renderRes.json();
 
-  // Poll until done
   for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 5000));
+    await sleep(5000);
     const statusRes = await fetch(`${EDIT_BASE}/render/${response.id}`, {
-      headers: EDIT_HEADERS,
+      headers: editHeaders(),
     });
     const { response: render } = await statusRes.json();
     if (render.status === 'done') return render.url;
@@ -189,15 +223,15 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
 }
 
 async function postToInstagram(videoUrl, caption) {
+  requireEnv(['IG_USER_ID', 'IG_ACCESS_TOKEN']);
   const igUserId = process.env.IG_USER_ID;
   const accessToken = process.env.IG_ACCESS_TOKEN;
-  const BASE = 'https://graph.facebook.com/v25.0';
 
   // The Graph API accepts both JSON and form-encoded bodies; form-encoded is used
   // here to match Meta's own examples and Postman collection.
 
   // 1. Create the Reels container
-  const containerRes = await fetch(`${BASE}/${igUserId}/media`, {
+  const containerRes = await fetch(`${IG_BASE}/${igUserId}/media`, {
     method: 'POST',
     body: new URLSearchParams({
       media_type: 'REELS',
@@ -212,29 +246,25 @@ async function postToInstagram(videoUrl, caption) {
   const { id: containerId } = await containerRes.json();
 
   // 2. Poll until FINISHED — once per minute, up to 5 minutes (per Meta's guidance)
-  let isFinished = false;
   for (let i = 0; i < 5; i++) {
-    await new Promise((r) => setTimeout(r, 60_000));
     const statusRes = await fetch(
-      `${BASE}/${containerId}?fields=status_code&access_token=${accessToken}`,
+      `${IG_BASE}/${containerId}?fields=status_code&access_token=${accessToken}`,
     );
     if (!statusRes.ok)
       throw new Error(`Container status check failed: ${statusRes.status}`);
     const { status_code } = await statusRes.json();
-    if (status_code === 'FINISHED') {
-      isFinished = true;
-      break;
-    }
+    if (status_code === 'FINISHED') break;
     if (status_code === 'ERROR' || status_code === 'EXPIRED')
       throw new Error(`Instagram container ${status_code.toLowerCase()}`);
+    if (i === 4)
+      throw new Error(
+        'Instagram container was not ready to publish after 5 minutes',
+      );
+    await sleep(60_000);
   }
-  if (!isFinished)
-    throw new Error(
-      'Instagram container was not ready to publish after 5 minutes',
-    );
 
   // 3. Publish the container
-  const publishRes = await fetch(`${BASE}/${igUserId}/media_publish`, {
+  const publishRes = await fetch(`${IG_BASE}/${igUserId}/media_publish`, {
     method: 'POST',
     body: new URLSearchParams({
       creation_id: containerId,
@@ -246,10 +276,17 @@ async function postToInstagram(videoUrl, caption) {
   return mediaId;
 }
 
-async function createAndPostReel(topic) {
+export async function createAndPostReel(topic, { publish = false } = {}) {
+  requireEnv([
+    'OPENAI_API_KEY',
+    'ELEVENLABS_API_KEY',
+    'ELEVENLABS_VOICE_ID',
+    'SHOTSTACK_API_KEY',
+  ]);
+
   console.log(`Starting pipeline for: "${topic}"`);
 
-  const { script, caption } = await generateContent(topic);
+  const { script, hook, caption } = await generateContent(topic);
   console.log('✓ Script and caption generated');
 
   // Generate voiceover and background image in parallel
@@ -265,9 +302,13 @@ async function createAndPostReel(topic) {
   ]);
   console.log('✓ Assets uploaded to Shotstack Ingest');
 
-  const hookText = script.split('.')[0];
-  const videoUrl = await renderReel(backgroundUrl, voiceoverUrl, hookText);
+  const videoUrl = await renderReel(backgroundUrl, voiceoverUrl, hook);
   console.log('✓ Reel rendered:', videoUrl);
+
+  if (!publish) {
+    console.log('Skipping Instagram publish. Pass --publish to post it.');
+    return { videoUrl, caption };
+  }
 
   const mediaId = await postToInstagram(videoUrl, caption);
   console.log('✓ Published to Instagram. Media ID:', mediaId);
@@ -275,5 +316,25 @@ async function createAndPostReel(topic) {
   return { mediaId, videoUrl, caption };
 }
 
-// Run it
-createAndPostReel('the future of remote work').catch(console.error);
+async function main() {
+  const args = process.argv.slice(2);
+  const publish = args.includes('--publish');
+  const topic = args.find((arg) => !arg.startsWith('--'));
+
+  if (!topic) {
+    console.error(
+      'Usage: node --env-file=.env index.js "<topic>" [--publish]\n\n' +
+        'Renders a Reel and prints the video URL. Add --publish to post it to Instagram.',
+    );
+    process.exit(1);
+  }
+
+  await createAndPostReel(topic, { publish });
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
+}
