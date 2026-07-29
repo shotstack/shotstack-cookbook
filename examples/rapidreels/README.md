@@ -16,7 +16,11 @@ yarn
 
 ### Configure API keys
 
-You require a Shotstack and OpenAI production API key. Copy these to `env.local.dist` and rename to `env.local`.
+You require a Shotstack and OpenAI production API key. Copy `.env.local.example` to `.env.local` and add your keys:
+
+```bash
+cp .env.local.example .env.local
+```
 
 ### Run development server
 
@@ -27,3 +31,14 @@ yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+### Build for production
+
+To run the app anywhere you can host a Node.js process:
+
+```bash
+yarn build
+yarn start
+```
+
+The API keys stay server-side in `pages/api`, so never expose them to the browser.
