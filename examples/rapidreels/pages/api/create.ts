@@ -1,4 +1,3 @@
-export const maxDuration = 5;
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { VideoConfig } from '@models/config';
 import { generateVideo } from '@services/shotstackService';
@@ -7,10 +6,6 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  res.setHeader('Access-Control-Allow-Origin', 'https://shotstack.io');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'POST') {
     try {
       const videoConfig: VideoConfig = req.body;

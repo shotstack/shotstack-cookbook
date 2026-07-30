@@ -1,59 +1,130 @@
 import OpenAI from 'openai';
+import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
 
-import { storyPrompts, imagePromptsGenerator } from '@constants/prompts';
-import { voiceoverSchema, imagePromptSchema } from '@validation/openai';
-import { Voiceover, ImagePrompt } from '@models/openai';
+import {
+  storyPrompts,
+  voiceoverSystem,
+  characterSpecSystem,
+  imagePromptSystem,
+  buildVoiceoverInstructions,
+  buildCharacterSpecInstructions,
+  buildImagePromptInstructions
+} from '@constants/prompts';
+import {
+  voiceoverSchema,
+  characterSpecSchema,
+  imagePromptSchema
+} from '@validation/openai';
+import { CharacterSpec, ImagePrompt } from '@models/openai';
 
-const openai = new OpenAI();
+const DEFAULT_MODEL = 'gpt-5.4-mini';
 
-export const generateVoiceover = async (
-  content: string
-): Promise<Voiceover> => {
-  console.info('Start voiceover script generation ...');
-  const voiceoverPrompt = storyPrompts[content as keyof typeof storyPrompts];
-  const voiceoverCompletion = await openai.chat.completions.create({
+// Constructed on first use so a missing key surfaces as a request error rather
+// than throwing at module load.
+let client: OpenAI | undefined;
+const openai = () => (client ??= new OpenAI());
+
+const model = () => process.env.OPENAI_MODEL || DEFAULT_MODEL;
+
+async function chatJson<T extends z.ZodTypeAny>({
+  system,
+  user,
+  schema,
+  schemaName,
+  maxTokens
+}: {
+  system: string;
+  user: string;
+  schema: T;
+  schemaName: string;
+  maxTokens: number;
+}): Promise<z.infer<T>> {
+  const completion = await openai().chat.completions.create({
+    model: model(),
+    // The gpt-5 family requires max_completion_tokens; gpt-4 also accepts it.
+    max_completion_tokens: maxTokens,
+    response_format: zodResponseFormat(schema, schemaName),
     messages: [
-      {
-        role: 'system',
-        content:
-          'You are a voiceover artist. You create voiceover transcripts for videos that are engaging and captivating. The voiceover is meant to be spoken by one narrator. Do not include descriptive meta language explaining the voiceover, just the voiceover itself.'
-      },
-      { role: 'user', content: voiceoverPrompt }
-    ],
-    model: 'gpt-4o-mini',
-    max_tokens: 500,
-    response_format: zodResponseFormat(voiceoverSchema, 'voiceover')
+      { role: 'system', content: system },
+      { role: 'user', content: user }
+    ]
   });
-  const voiceover = JSON.parse(
-    voiceoverCompletion.choices[0].message.content || '{}'
-  );
-  return voiceover;
+
+  const choice = completion.choices[0];
+  if (choice?.finish_reason === 'length') {
+    throw new Error(
+      `${schemaName} response was truncated, increase max_completion_tokens`
+    );
+  }
+  if (!choice?.message?.content) {
+    throw new Error(`${schemaName} response was empty`);
+  }
+
+  return schema.parse(JSON.parse(choice.message.content));
+}
+
+export const generateVoiceover = async (content: string): Promise<string> => {
+  console.info('Start voiceover script generation ...');
+
+  const storyPrompt = storyPrompts[content as keyof typeof storyPrompts];
+  if (!storyPrompt) throw new Error(`Unknown content type: ${content}`);
+
+  const { variants, bestIndex } = await chatJson({
+    system: voiceoverSystem,
+    user: buildVoiceoverInstructions(storyPrompt),
+    schema: voiceoverSchema,
+    schemaName: 'voiceover_variants',
+    maxTokens: 4000
+  });
+
+  const usable = variants.filter((variant) => variant.text.trim());
+  if (usable.length === 0) throw new Error('No usable voiceover variants');
+
+  const index = Math.min(Math.max(bestIndex, 0), usable.length - 1);
+  return usable[index].text.trim();
+};
+
+export const generateCharacterSpec = async (
+  voiceover: string
+): Promise<CharacterSpec> => {
+  console.info('Start character spec generation ...');
+
+  const spec = await chatJson({
+    system: characterSpecSystem,
+    user: buildCharacterSpecInstructions(voiceover),
+    schema: characterSpecSchema,
+    schemaName: 'character_spec',
+    maxTokens: 2000
+  });
+
+  if (!spec.character.trim() || !spec.style.trim()) {
+    throw new Error('Character spec is missing character or style');
+  }
+  return spec;
 };
 
 export const generateImagePrompts = async (
-  voiceover: string
+  voiceover: string,
+  spec: CharacterSpec
 ): Promise<ImagePrompt> => {
   console.info('Start image prompts generation ...');
-  const imagePrompt = imagePromptsGenerator(voiceover);
-  console.log('imagePrompt', imagePrompt);
-  const imageCompletion = await openai.chat.completions.create({
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are an image prompt engineer who produces high quality, detailed, and specific image prompts for AI image generation. You also provide a 3-word headline for the image sequence.'
-      },
-      { role: 'user', content: imagePrompt }
-    ],
-    model: 'gpt-4o-mini',
-    max_tokens: 5000,
-    response_format: zodResponseFormat(imagePromptSchema, 'imagePrompts')
+
+  const { headline, prompts } = await chatJson({
+    system: imagePromptSystem,
+    user: buildImagePromptInstructions(voiceover, spec.character, spec.style),
+    schema: imagePromptSchema,
+    schemaName: 'image_prompts',
+    maxTokens: 8000
   });
-  console.log('imageCompletion', imageCompletion);
-  const imagePrompts = JSON.parse(
-    imageCompletion.choices[0].message.content || '{}'
-  );
-  console.log('imagePrompts', imagePrompts);
-  return imagePrompts;
+
+  const usable = prompts.filter((prompt) => prompt.trim());
+  // The timeline has six image slots, so fewer than six leaves visible gaps.
+  if (!headline.trim() || usable.length < 6) {
+    throw new Error(
+      `Expected a headline and 6 image prompts, got ${usable.length} prompts`
+    );
+  }
+
+  return { headline: headline.trim(), prompts: usable.slice(0, 6) };
 };

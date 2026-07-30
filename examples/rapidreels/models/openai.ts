@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { voiceoverSchema, imagePromptSchema } from '@validation/openai';
+import {
+  voiceoverSchema,
+  characterSpecSchema,
+  imagePromptSchema
+} from '@validation/openai';
 
-export type Voiceover = z.infer<typeof voiceoverSchema>;
+export type VoiceoverVariants = z.infer<typeof voiceoverSchema>;
+export type CharacterSpec = z.infer<typeof characterSpecSchema>;
 export type ImagePrompt = z.infer<typeof imagePromptSchema>;

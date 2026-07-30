@@ -1,0 +1,26 @@
+{
+  "name": "instagram-ai-video",
+  "version": "1.0.0",
+  "description": "Automate Instagram Reels end-to-end: generate a script and caption with OpenAI, a voiceover with ElevenLabs, a background with a GPT Image model, render a 1080x1920 video with the Shotstack Edit API, and publish it via the Instagram Graph API.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --env-file=.env index.js"
+  },
+  "keywords": [
+    "shotstack",
+    "instagram",
+    "reels",
+    "video-automation",
+    "ai-video",
+    "video-api"
+  ],
+  "author": "Shotstack",
+  "license": "MIT",
+  "dependencies": {
+    "openai": "^7.1.0"
+  },
+  "engines": {
+    "node": ">=20.6"
+  }
+}
