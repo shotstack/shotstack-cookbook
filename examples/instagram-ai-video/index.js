@@ -7,8 +7,9 @@ const IG_BASE = 'https://graph.facebook.com/v25.0';
 
 const VIDEO_DURATION = 20; // seconds — matches the 15-20s script target
 
-// Shotstack has no system fonts installed, so the family has to be loaded from a
-// URL. The family name is the file basename: they must match or the font won't load.
+// The render engine has a small built-in font set, all at weight 400. This hook
+// wants a heavier weight, so the face is loaded from a URL instead. The family
+// name is the file basename: they must match or the font silently won't load.
 const FONT_SRC =
   'https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm45xW5rygbi49c.ttf';
 const FONT_FAMILY = 'JTUSjIg1_i6t8kCHKm45xW5rygbi49c';

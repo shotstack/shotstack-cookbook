@@ -1,252 +1,200 @@
-// You can edit this template on https://dashboard.shotstack.io/studio/overview
-export const template = {
-  timeline: {
-    background: '#000000',
-    tracks: [
-      {
-        clips: [
-          {
-            asset: {
-              type: 'text',
-              text: '{{ headline }}',
-              alignment: {
-                horizontal: 'left',
-                vertical: 'center'
-              },
-              font: {
-                color: '#000000',
-                family: 'Montserrat ExtraBold',
-                size: '60',
-                lineHeight: 1
-              },
-              width: 437,
-              height: 200
-            },
-            start: 0.954,
-            length: 'auto',
-            offset: {
-              x: 0,
-              y: 0.302
-            },
-            position: 'center',
-            fit: 'none',
-            scale: 1
-          }
-        ]
+import { storyFonts, defaultStoryFont, StoryFont } from '@constants/fonts';
+
+// Six AI-generated images alternate across two tracks so consecutive clips can
+// cross-fade. Clips on a single track must not overlap, so a fade needs two.
+const imageTrackRight = {
+  clips: [
+    {
+      fit: 'crop',
+      scale: 1,
+      length: 5,
+      asset: {
+        width: '768',
+        height: '1280',
+        type: 'text-to-image',
+        prompt: '{{ image-prompt-2 }}'
       },
-      {
-        clips: [
-          {
-            length: 'auto',
-            asset: {
-              type: 'image',
-              src: 'https://shotstack-ingest-api-v1-sources.s3.ap-southeast-2.amazonaws.com/wzr6y0wtti/zzz01j7c-z74py-r3651-kegfa-f703hd/source.png'
-            },
-            start: 0.954,
-            scale: 0.199,
-            offset: {
-              x: -0.016,
-              y: 0.304
-            },
-            position: 'center'
-          }
-        ]
+      start: 4,
+      effect: 'zoomOut',
+      transition: { in: 'fade', out: 'fade' }
+    },
+    {
+      fit: 'crop',
+      scale: 1,
+      length: 5,
+      asset: {
+        width: '768',
+        height: '1280',
+        type: 'text-to-image',
+        prompt: '{{ image-prompt-4 }}'
       },
-      {
-        clips: [
-          {
-            length: 'end',
-            asset: {
-              type: 'caption',
-              src: 'alias://voiceover',
-              background: {
-                color: '#ff0000',
-                padding: 19,
-                borderRadius: 7
-              },
-              font: {
-                size: '28'
-              }
-            },
-            start: 0
-          }
-        ]
+      start: 12,
+      effect: 'zoomOut',
+      transition: { in: 'fade', out: 'fade' }
+    },
+    {
+      fit: 'crop',
+      scale: 1,
+      length: 'end',
+      asset: {
+        width: '768',
+        height: '1280',
+        type: 'text-to-image',
+        prompt: '{{ image-prompt-6 }}'
       },
-      {
-        clips: [
-          {
-            fit: 'crop',
-            scale: 1,
-            length: 5,
-            asset: {
-              width: '768',
-              height: '1280',
-              type: 'text-to-image',
-              prompt: '{{ image-prompt-2 }}'
-            },
-            start: 4,
-            effect: 'zoomOut',
-            transition: {
-              in: 'fade',
-              out: 'fade'
-            }
-          },
-          {
-            fit: 'crop',
-            scale: 1,
-            length: 5,
-            asset: {
-              width: '768',
-              height: '1280',
-              type: 'text-to-image',
-              prompt: '{{ image-prompt-4 }}'
-            },
-            start: 12,
-            effect: 'zoomOut',
-            transition: {
-              in: 'fade',
-              out: 'fade'
-            }
-          },
-          {
-            fit: 'crop',
-            scale: 1,
-            length: 'end',
-            asset: {
-              width: '768',
-              height: '1280',
-              type: 'text-to-image',
-              prompt: '{{ image-prompt-6 }}'
-            },
-            start: 20,
-            effect: 'zoomOut',
-            transition: {
-              in: 'fade',
-              out: 'fade'
-            }
-          }
-        ]
-      },
-      {
-        clips: [
-          {
-            fit: 'crop',
-            scale: 1,
-            length: 5,
-            asset: {
-              width: '768',
-              height: '1280',
-              type: 'text-to-image',
-              prompt: '{{ image-prompt-1 }}'
-            },
-            start: 0,
-            effect: 'zoomOut',
-            transition: {
-              in: 'fade',
-              out: 'fade'
-            }
-          },
-          {
-            fit: 'crop',
-            scale: 1,
-            length: 5,
-            asset: {
-              width: '768',
-              height: '1280',
-              type: 'text-to-image',
-              prompt: '{{ image-prompt-3 }}'
-            },
-            start: 8,
-            effect: 'zoomOut',
-            transition: {
-              in: 'fade',
-              out: 'fade'
-            }
-          },
-          {
-            fit: 'crop',
-            scale: 1,
-            length: 5,
-            asset: {
-              width: '768',
-              height: '1280',
-              type: 'text-to-image',
-              prompt: '{{ image-prompt-5 }}'
-            },
-            start: 16,
-            effect: 'zoomOut',
-            transition: {
-              in: 'fade',
-              out: 'fade'
-            }
-          }
-        ]
-      },
-      {
-        clips: [
-          {
-            length: 'auto',
-            asset: {
-              voice: 'Olivia',
-              text: '{{ voiceover }}',
-              type: 'text-to-speech'
-            },
-            start: 0,
-            alias: 'voiceover'
-          }
-        ]
-      }
-    ]
-  },
-  output: {
-    format: 'mp4',
-    fps: 25,
-    size: {
-      width: 720,
-      height: 1280
-    },
-    destinations: [
-      {
-        provider: 'tiktok'
-      }
-    ]
-  },
-  merge: [
-    {
-      find: 'headline',
-      replace: 'Surprising Wildlife Wonders'
-    },
-    {
-      find: 'voiceover',
-      replace: 'wadup doc'
-    },
-    {
-      find: 'image-prompt-1',
-      replace: 'a sexy giraffe'
-    },
-    {
-      find: 'image-prompt-2',
-      replace: 'a sexy giraffe'
-    },
-    {
-      find: 'image-prompt-3',
-      replace: 'a sexy giraffe'
-    },
-    {
-      find: 'image-prompt-4',
-      replace: 'a sexy giraffe'
-    },
-    {
-      find: 'image-prompt-5',
-      replace: 'a sexy giraffe'
-    },
-    {
-      find: 'image-prompt-6',
-      replace: 'a sexy giraffe'
-    },
-    {
-      find: 'voice',
-      replace: 'Olivia'
+      start: 20,
+      effect: 'zoomOut',
+      transition: { in: 'fade', out: 'fade' }
     }
   ]
+};
+
+const imageTrackLeft = {
+  clips: [
+    {
+      fit: 'crop',
+      scale: 1,
+      length: 5,
+      asset: {
+        width: '768',
+        height: '1280',
+        type: 'text-to-image',
+        prompt: '{{ image-prompt-1 }}'
+      },
+      start: 0,
+      effect: 'zoomOut',
+      transition: { in: 'fade', out: 'fade' }
+    },
+    {
+      fit: 'crop',
+      scale: 1,
+      length: 5,
+      asset: {
+        width: '768',
+        height: '1280',
+        type: 'text-to-image',
+        prompt: '{{ image-prompt-3 }}'
+      },
+      start: 8,
+      effect: 'zoomOut',
+      transition: { in: 'fade', out: 'fade' }
+    },
+    {
+      fit: 'crop',
+      scale: 1,
+      length: 5,
+      asset: {
+        width: '768',
+        height: '1280',
+        type: 'text-to-image',
+        prompt: '{{ image-prompt-5 }}'
+      },
+      start: 16,
+      effect: 'zoomOut',
+      transition: { in: 'fade', out: 'fade' }
+    }
+  ]
+};
+
+// The alias lets the caption track transcribe this clip's generated audio.
+const audioTrack = {
+  clips: [
+    {
+      length: 'auto',
+      asset: {
+        voice: '{{ voice }}',
+        text: '{{ voiceover }}',
+        type: 'text-to-speech'
+      },
+      start: 0,
+      alias: 'voiceover'
+    }
+  ]
+};
+
+const headlineTrack = (fonts: StoryFont) => ({
+  clips: [
+    {
+      asset: {
+        type: 'rich-text',
+        text: '{{ headline }}',
+        font: {
+          family: fonts.headline.family,
+          size: 64,
+          color: '#ffffff',
+          weight: 800
+        },
+        stroke: { width: 6, color: '#000000', opacity: 1 },
+        align: { horizontal: 'center', vertical: 'middle' }
+      },
+      start: 0.5,
+      length: 4,
+      width: 640,
+      height: 220,
+      fit: 'none',
+      offset: { x: 0, y: 0.32 },
+      transition: { in: 'fade', out: 'fade' }
+    }
+  ]
+});
+
+const captionTrack = (fonts: StoryFont) => ({
+  clips: [
+    {
+      asset: {
+        type: 'rich-caption',
+        src: 'alias://voiceover',
+        font: {
+          family: fonts.caption.family,
+          size: 56,
+          color: '#ffffff',
+          opacity: 1,
+          weight: 700
+        },
+        animation: { style: 'pop' },
+        border: { width: 0, color: '#000000', opacity: 1, radius: 18 },
+        style: { textTransform: 'none' },
+        padding: { top: 25, right: 0, bottom: 0, left: 0 },
+        stroke: { width: 8, color: '#000000', opacity: 1 },
+        active: {
+          font: { color: fonts.captionActiveColor },
+          stroke: { width: 8, color: '#000000', opacity: 1 }
+        }
+      },
+      start: 0,
+      length: 'end',
+      width: 640,
+      height: 160,
+      fit: 'none',
+      offset: { x: 0, y: -0.35 }
+    }
+  ]
+});
+
+// tracks[0] is the TOP layer, so the text tracks come before the images.
+export const buildTemplate = (storyType: string) => {
+  const fonts = storyFonts[storyType] || defaultStoryFont;
+  // Some stories use one face for both, and loading the same URL twice errors.
+  const fontUrls = [fonts.headline.url, fonts.caption.url].filter(
+    (url, index, all) => all.indexOf(url) === index
+  );
+
+  return {
+    timeline: {
+      background: '#000000',
+      fonts: fontUrls.map((src) => ({ src })),
+      tracks: [
+        headlineTrack(fonts),
+        captionTrack(fonts),
+        imageTrackRight,
+        imageTrackLeft,
+        audioTrack
+      ]
+    },
+    output: {
+      format: 'mp4',
+      fps: 25,
+      size: { width: 720, height: 1280 }
+    }
+  };
 };

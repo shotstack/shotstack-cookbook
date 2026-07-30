@@ -70,4 +70,4 @@ const { videoUrl } = await createAndPostReel('the future of remote work');
 
 - Instagram accounts are limited to 100 API-published posts per 24-hour moving period.
 - Shotstack render URLs expire after 24 hours — publish promptly or transfer output to hosting with the [Serve API](https://shotstack.io/docs/guide/serving-assets/hosting/).
-- The on-screen hook uses a Google Font loaded via `timeline.fonts`. Shotstack has no system fonts installed, so `font.family` must match the font file's basename.
+- The on-screen hook loads a Google Font via `timeline.fonts` to get a bolder weight than the built-in font set offers. When loading a font this way, `font.family` must match the font file's basename or it silently won't apply.

@@ -5,10 +5,11 @@ import {
 import { VideoConfig } from '@models/config';
 import {
   generateVoiceover,
+  generateCharacterSpec,
   generateImagePrompts
 } from '@services/openAIService';
 
-import { template } from '@constants/template';
+import { buildTemplate } from '@constants/template';
 
 const SHOTSTACK_API_URL = 'https://api.shotstack.io/edit/v1';
 const SHOTSTACK_API_KEY = process.env.SHOTSTACK_API_KEY || '';
@@ -18,28 +19,27 @@ export const generateVideo = async (
 ): Promise<string> => {
   console.info('Start video generation ...');
 
+  // Three staged calls: the voiceover sets the story, the character spec pins one
+  // visual identity, and the image prompts reuse that spec so the six generated
+  // images don't drift into looking like six different videos.
   const voiceover = await generateVoiceover(configData.content);
-  console.log('voiceover', voiceover);
-  const imagePrompts = await generateImagePrompts(voiceover.text);
-  console.log('imagePrompts', imagePrompts);
+  const characterSpec = await generateCharacterSpec(voiceover);
+  const imagePrompts = await generateImagePrompts(voiceover, characterSpec);
+
   const merge = [
-    { find: 'headline', replace: imagePrompts.headline },
+    { find: 'headline', replace: imagePrompts.headline.toUpperCase() },
     { find: 'voice', replace: configData.voice },
+    { find: 'voiceover', replace: voiceover },
     ...imagePrompts.prompts.map((prompt: string, index: number) => ({
       find: `image-prompt-${index + 1}`,
       replace: prompt
-    })),
-    { find: 'voiceover', replace: voiceover.text }
+    }))
   ];
 
-  console.log('merge', merge);
-
   const payload = {
-    ...template,
+    ...buildTemplate(configData.content),
     merge: merge
   };
-
-  console.log('payload', payload);
 
   const response = await fetch(`${SHOTSTACK_API_URL}/render`, {
     method: 'POST',
@@ -50,10 +50,11 @@ export const generateVideo = async (
     body: JSON.stringify(payload)
   });
 
-  console.log('response', response);
-
   if (!response.ok) {
-    throw new Error('Failed to generate video');
+    // Surface the API's own message: a rejected Edit is the usual cause and the
+    // body names the offending field.
+    const detail = await response.text();
+    throw new Error(`Failed to generate video: ${detail.slice(0, 200)}`);
   }
 
   const data: ShotstackRenderResponse = await response.json();
