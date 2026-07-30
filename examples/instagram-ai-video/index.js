@@ -7,17 +7,12 @@ const IG_BASE = 'https://graph.facebook.com/v25.0';
 
 const VIDEO_DURATION = 20; // seconds — matches the 15-20s script target
 
-// The render engine has a small built-in font set, all at weight 400. This hook
-// wants a heavier weight, so the face is loaded from a URL instead. The family
-// name is the file basename: they must match or the font silently won't load.
 const FONT_SRC =
   'https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm45xW5rygbi49c.ttf';
 const FONT_FAMILY = 'JTUSjIg1_i6t8kCHKm45xW5rygbi49c';
 
 const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2';
 
-// Constructed on first use: the client throws if the key is missing, and we want
-// the friendlier requireEnv message to fire first.
 let openaiClient;
 const openai = () =>
   (openaiClient ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY }));
@@ -98,7 +93,6 @@ Bold colors, visually striking, no text, no people. Designed for 9:16 portrait f
 }
 
 async function uploadToShotstack(buffer, contentType) {
-  // 1. Request a signed upload URL
   const uploadRes = await fetch(`${INGEST_BASE}/upload`, {
     method: 'POST',
     headers: { ...ingestHeaders(), 'Content-Type': 'application/json' },
@@ -109,7 +103,6 @@ async function uploadToShotstack(buffer, contentType) {
   const { data } = await uploadRes.json();
   const { id: sourceId, url: signedUrl } = data.attributes;
 
-  // 2. Upload binary data to the signed URL
   const putRes = await fetch(signedUrl, {
     method: 'PUT',
     headers: { 'Content-Type': contentType },
@@ -117,7 +110,6 @@ async function uploadToShotstack(buffer, contentType) {
   });
   if (!putRes.ok) throw new Error(`Signed URL upload failed: ${putRes.status}`);
 
-  // 3. Poll until ready (usually a few seconds)
   for (let i = 0; i < 20; i++) {
     const statusRes = await fetch(`${INGEST_BASE}/sources/${sourceId}`, {
       headers: ingestHeaders(),
@@ -136,7 +128,6 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
   const edit = {
     timeline: {
       fonts: [{ src: FONT_SRC }],
-      // tracks[0] is the TOP layer — overlays first, background last.
       tracks: [
         {
           clips: [
@@ -163,7 +154,6 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
               },
               start: 0,
               length: VIDEO_DURATION,
-              // The clip box sets the text wrap width, not the asset.
               width: 940,
               height: 400,
               position: 'bottom',
@@ -227,10 +217,6 @@ async function postToInstagram(videoUrl, caption) {
   const igUserId = process.env.IG_USER_ID;
   const accessToken = process.env.IG_ACCESS_TOKEN;
 
-  // The Graph API accepts both JSON and form-encoded bodies; form-encoded is used
-  // here to match Meta's own examples and Postman collection.
-
-  // 1. Create the Reels container
   const containerRes = await fetch(`${IG_BASE}/${igUserId}/media`, {
     method: 'POST',
     body: new URLSearchParams({
@@ -245,7 +231,6 @@ async function postToInstagram(videoUrl, caption) {
     throw new Error(`Container creation failed: ${containerRes.status}`);
   const { id: containerId } = await containerRes.json();
 
-  // 2. Poll until FINISHED — once per minute, up to 5 minutes (per Meta's guidance)
   for (let i = 0; i < 5; i++) {
     const statusRes = await fetch(
       `${IG_BASE}/${containerId}?fields=status_code&access_token=${accessToken}`,
@@ -263,7 +248,6 @@ async function postToInstagram(videoUrl, caption) {
     await sleep(60_000);
   }
 
-  // 3. Publish the container
   const publishRes = await fetch(`${IG_BASE}/${igUserId}/media_publish`, {
     method: 'POST',
     body: new URLSearchParams({
@@ -283,8 +267,6 @@ export async function createAndPostReel(topic, { publish = false } = {}) {
     'ELEVENLABS_VOICE_ID',
     'SHOTSTACK_API_KEY',
   ]);
-  // Checked before any work starts: the render costs money and takes minutes, so
-  // discovering the Instagram credentials are missing afterwards is too late.
   if (publish) requireEnv(['IG_USER_ID', 'IG_ACCESS_TOKEN']);
 
   console.log(`Starting pipeline for: "${topic}"`);
@@ -292,13 +274,11 @@ export async function createAndPostReel(topic, { publish = false } = {}) {
   const { script, hook, caption } = await generateContent(topic);
   console.log('✓ Script and caption generated');
 
-  // Generate voiceover and background image in parallel
   const [voiceoverBuffer, backgroundBuffer] = await Promise.all([
     generateVoiceover(script),
     generateBackground(topic),
   ]);
 
-  // Upload both assets to Shotstack Ingest in parallel
   const [voiceoverUrl, backgroundUrl] = await Promise.all([
     uploadToShotstack(voiceoverBuffer, 'audio/mpeg'),
     uploadToShotstack(backgroundBuffer, 'image/png'),
