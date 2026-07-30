@@ -5,7 +5,7 @@ const INGEST_BASE = 'https://api.shotstack.io/ingest/v1';
 const EDIT_BASE = 'https://api.shotstack.io/edit/v1';
 const IG_BASE = 'https://graph.facebook.com/v25.0';
 
-const VIDEO_DURATION = 20; // seconds — matches the 15-20s script target
+const FALLBACK_DURATION = 20; // seconds, only if Ingest reports no duration
 
 const FONT_SRC =
   'https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm45xW5rygbi49c.ttf';
@@ -115,7 +115,8 @@ async function uploadToShotstack(buffer, contentType) {
       headers: ingestHeaders(),
     });
     const { data: src } = await statusRes.json();
-    if (src.attributes.status === 'ready') return src.attributes.source;
+    if (src.attributes.status === 'ready')
+      return { url: src.attributes.source, duration: src.attributes.duration };
     if (src.attributes.status === 'failed')
       throw new Error('Shotstack ingest failed');
     await sleep(3000);
@@ -124,7 +125,7 @@ async function uploadToShotstack(buffer, contentType) {
   throw new Error('Shotstack ingest timed out');
 }
 
-async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
+async function renderReel(backgroundUrl, voiceoverUrl, hookText, duration) {
   const edit = {
     timeline: {
       fonts: [{ src: FONT_SRC }],
@@ -153,7 +154,7 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
                 animation: { preset: 'ascend', duration: 0.6, direction: 'up' },
               },
               start: 0,
-              length: VIDEO_DURATION,
+              length: duration,
               width: 940,
               height: 400,
               position: 'bottom',
@@ -166,7 +167,7 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
             {
               asset: { type: 'image', src: backgroundUrl },
               start: 0,
-              length: VIDEO_DURATION,
+              length: duration,
               fit: 'crop',
               effect: 'zoomIn',
             },
@@ -279,13 +280,22 @@ export async function createAndPostReel(topic, { publish = false } = {}) {
     generateBackground(topic),
   ]);
 
-  const [voiceoverUrl, backgroundUrl] = await Promise.all([
+  const [voiceover, background] = await Promise.all([
     uploadToShotstack(voiceoverBuffer, 'audio/mpeg'),
     uploadToShotstack(backgroundBuffer, 'image/png'),
   ]);
   console.log('✓ Assets uploaded to Shotstack Ingest');
 
-  const videoUrl = await renderReel(backgroundUrl, voiceoverUrl, hook);
+  // Ingest reports the voiceover's duration, so the visuals can end with the
+  // narration instead of running to a fixed length and leaving dead air.
+  const duration = voiceover.duration ?? FALLBACK_DURATION;
+
+  const videoUrl = await renderReel(
+    background.url,
+    voiceover.url,
+    hook,
+    duration,
+  );
   console.log('✓ Reel rendered:', videoUrl);
 
   if (!publish) {
