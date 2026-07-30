@@ -20,8 +20,6 @@ import { CharacterSpec, ImagePrompt } from '@models/openai';
 
 const DEFAULT_MODEL = 'gpt-5.4-mini';
 
-// Constructed on first use so a missing key surfaces as a request error rather
-// than throwing at module load.
 let client: OpenAI | undefined;
 const openai = () => (client ??= new OpenAI());
 
@@ -42,7 +40,6 @@ async function chatJson<T extends z.ZodTypeAny>({
 }): Promise<z.infer<T>> {
   const completion = await openai().chat.completions.create({
     model: model(),
-    // The gpt-5 family requires max_completion_tokens; gpt-4 also accepts it.
     max_completion_tokens: maxTokens,
     response_format: zodResponseFormat(schema, schemaName),
     messages: [
@@ -78,7 +75,7 @@ export const generateVoiceover = async (content: string): Promise<string> => {
     maxTokens: 4000
   });
 
-  const usable = variants.filter((variant) => variant.text.trim());
+  const usable = variants.filter(variant => variant.text.trim());
   if (usable.length === 0) throw new Error('No usable voiceover variants');
 
   const index = Math.min(Math.max(bestIndex, 0), usable.length - 1);
@@ -118,8 +115,7 @@ export const generateImagePrompts = async (
     maxTokens: 8000
   });
 
-  const usable = prompts.filter((prompt) => prompt.trim());
-  // The timeline has six image slots, so fewer than six leaves visible gaps.
+  const usable = prompts.filter(prompt => prompt.trim());
   if (!headline.trim() || usable.length < 6) {
     throw new Error(
       `Expected a headline and 6 image prompts, got ${usable.length} prompts`

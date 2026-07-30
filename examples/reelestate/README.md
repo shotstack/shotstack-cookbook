@@ -31,3 +31,14 @@ yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Editing with an AI agent
+
+If you are working on this example with Claude Code or another coding agent, install the Shotstack CLI and its skill first:
+
+```bash
+npm install -g @shotstack/cli
+npx skills add shotstack/shotstack-cli
+```
+
+The skill gives the agent the Edit JSON authoring conventions, which are easy to get wrong from instinct. `shotstack validate <file>` then lints a template offline, no API key and no render credits. See the [agent guide](https://shotstack.io/docs/guide/agents/cli/).

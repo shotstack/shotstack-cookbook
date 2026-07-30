@@ -71,3 +71,14 @@ const { videoUrl } = await createAndPostReel('the future of remote work');
 - Instagram accounts are limited to 100 API-published posts per 24-hour moving period.
 - Shotstack render URLs expire after 24 hours — publish promptly or transfer output to hosting with the [Serve API](https://shotstack.io/docs/guide/serving-assets/hosting/).
 - The on-screen hook loads a Google Font via `timeline.fonts` to get a bolder weight than the built-in font set offers. When loading a font this way, `font.family` must match the font file's basename or it silently won't apply.
+
+## Editing with an AI agent
+
+If you are working on this example with Claude Code or another coding agent, install the Shotstack CLI and its skill first:
+
+```bash
+npm install -g @shotstack/cli
+npx skills add shotstack/shotstack-cli
+```
+
+The skill gives the agent the Edit JSON authoring conventions, which are easy to get wrong from instinct. `shotstack validate <file>` then lints a template offline, no API key and no render credits. See the [agent guide](https://shotstack.io/docs/guide/agents/cli/).

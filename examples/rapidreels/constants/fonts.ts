@@ -1,15 +1,3 @@
-// Per-story font and accent palette, used by the rich-text headline and the
-// rich-caption track.
-//
-// The render engine ships a small built-in font set (Montserrat, Open Sans,
-// Roboto and friends, all weight 400). These display faces are not in it, so
-// each is loaded from a URL via timeline.fonts.
-//
-// The `family` value is the URL filename without the .ttf extension. Shotstack
-// looks the loaded font up by basename, so if the two drift apart the font
-// silently fails to apply. Never hand-edit these URLs: Google rotates the
-// version segment and the hash, so a reconstructed URL 404s.
-
 export type StoryFont = {
   headline: { url: string; family: string };
   caption: { url: string; family: string };

@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-// Three variants are generated so the model picks its own strongest hook, which
-// beats asking for one and hoping.
 export const voiceoverSchema = z.object({
   variants: z.array(z.object({ text: z.string() })),
   bestIndex: z.number().int()

@@ -1,7 +1,5 @@
 import { storyFonts, defaultStoryFont, StoryFont } from '@constants/fonts';
 
-// Six AI-generated images alternate across two tracks so consecutive clips can
-// cross-fade. Clips on a single track must not overlap, so a fade needs two.
 const imageTrackRight = {
   clips: [
     {
@@ -96,7 +94,6 @@ const imageTrackLeft = {
   ]
 };
 
-// The alias lets the caption track transcribe this clip's generated audio.
 const audioTrack = {
   clips: [
     {
@@ -171,10 +168,8 @@ const captionTrack = (fonts: StoryFont) => ({
   ]
 });
 
-// tracks[0] is the TOP layer, so the text tracks come before the images.
 export const buildTemplate = (storyType: string) => {
   const fonts = storyFonts[storyType] || defaultStoryFont;
-  // Some stories use one face for both, and loading the same URL twice errors.
   const fontUrls = [fonts.headline.url, fonts.caption.url].filter(
     (url, index, all) => all.indexOf(url) === index
   );
@@ -182,7 +177,7 @@ export const buildTemplate = (storyType: string) => {
   return {
     timeline: {
       background: '#000000',
-      fonts: fontUrls.map((src) => ({ src })),
+      fonts: fontUrls.map(src => ({ src })),
       tracks: [
         headlineTrack(fonts),
         captionTrack(fonts),

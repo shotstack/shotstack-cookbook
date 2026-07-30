@@ -1,6 +1,3 @@
-// Story type -> voiceover prompt. Each enforces: hook in the first 8 words or
-// fewer, a 70-80 word budget (about 30s at 150 wpm) to match the six-clip
-// visual timeline, a three-beat structure, and a sixth-grade reading level.
 export const storyPrompts = {
   'Scary Story':
     'Write a 30-second scary story voiceover (70–80 words at ~150 wpm — must fill the full 30 seconds). Open with ≤8 words: a curiosity gap or sensory cold-open ("At 3:13 AM I heard scratching"). Three beats: hook (0–3s), confrontation (3–25s), resolution (25–30s). Present tense, short clauses, sixth-grade reading level. Concrete sensory detail — sound, texture, temperature. End on a gut-punch image.',
