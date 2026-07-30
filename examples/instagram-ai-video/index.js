@@ -224,7 +224,6 @@ async function renderReel(backgroundUrl, voiceoverUrl, hookText) {
 }
 
 async function postToInstagram(videoUrl, caption) {
-  requireEnv(['IG_USER_ID', 'IG_ACCESS_TOKEN']);
   const igUserId = process.env.IG_USER_ID;
   const accessToken = process.env.IG_ACCESS_TOKEN;
 
@@ -284,6 +283,9 @@ export async function createAndPostReel(topic, { publish = false } = {}) {
     'ELEVENLABS_VOICE_ID',
     'SHOTSTACK_API_KEY',
   ]);
+  // Checked before any work starts: the render costs money and takes minutes, so
+  // discovering the Instagram credentials are missing afterwards is too late.
+  if (publish) requireEnv(['IG_USER_ID', 'IG_ACCESS_TOKEN']);
 
   console.log(`Starting pipeline for: "${topic}"`);
 
