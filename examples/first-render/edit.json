@@ -1,0 +1,31 @@
+{
+  "timeline": {
+    "background": "#101827",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "Hello World",
+              "font": {
+                "size": 64,
+                "color": "#ffffff"
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "middle"
+              }
+            },
+            "start": 0,
+            "length": 5
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "preview"
+  }
+}
