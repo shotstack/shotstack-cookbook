@@ -1,7 +1,8 @@
 # First render
 
-Render your first video with the Shotstack API: submit an Edit, poll the render status, and get the
-output URL. The same flow is implemented twice, in Node.js and in Python.
+The very basics of the Shotstack API — the loop every other example in this cookbook builds on:
+submit an Edit, poll the render status, and get the output URL. The same flow is implemented twice,
+in Node.js and in Python. Start here if you have never rendered a video with Shotstack before.
 
 Companion code for [Render your first video with the Shotstack API](https://shotstack.io/learn/render-your-first-video-shotstack-api/).
 
