@@ -1,6 +1,6 @@
 # First render
 
-The very basics of the Shotstack API — the loop every other example in this cookbook builds on:
+The very basics of the Shotstack API, and the loop every other example in this cookbook builds on:
 submit an Edit, poll the render status, and get the output URL. The same flow is implemented twice,
 in Node.js and in Python. Start here if you have never rendered a video with Shotstack before.
 
