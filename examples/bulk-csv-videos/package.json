@@ -1,0 +1,13 @@
+{
+  "name": "bulk-csv-videos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Render one video per CSV row from a single Shotstack template, with an optional AI data step",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "csv-parse": "^7.0.2"
+  }
+}
