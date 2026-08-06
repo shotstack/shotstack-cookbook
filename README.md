@@ -2,7 +2,7 @@
 
 Example applications and companion code for Shotstack guides and tutorials.
 
-Clone this repo, or head into the folder for the example you want. Each example has its own README with the API keys and setup steps it needs.
+Clone this repository, or open the directory of the example you want. Each example has its own README. The README gives the API keys and the setup steps for that example.
 
 ## Examples
 
@@ -10,13 +10,17 @@ Clone this repo, or head into the folder for the example you want. Each example 
 - [rapidreels](examples/rapidreels) creates faceless short-form videos using generative AI. [View demo](https://shotstack.io/demos/social-media-video-maker/).
 - [reelestate](examples/reelestate) turns static real estate images into fully edited video slideshows. [View demo](https://shotstack.io/demos/real-estate-video-listing-maker/).
 
+## Contributing
+
+To make a new example, copy [`examples/_template`](examples/_template). Then read [STANDARDS.md](STANDARDS.md). It gives the rules for API keys, failures, README structure, and the checks to do before you make a pull request.
+
 ## Editing with an AI agent
 
-If you are working on these examples with Claude Code or another coding agent, install the Shotstack CLI and its skill first:
+Install the Shotstack CLI and its skill before you use a coding agent, such as Claude Code, on these examples:
 
 ```bash
 npm install -g @shotstack/cli
 npx skills add shotstack/shotstack-cli
 ```
 
-The skill gives the agent the Edit JSON authoring conventions, which are easy to get wrong from instinct. `shotstack validate <file>` then lints a template offline, no API key and no render credits. See the [agent guide](https://shotstack.io/docs/guide/agents/cli/).
+The skill gives the agent the rules to write Edit JSON. These rules are easy to get wrong. The `shotstack validate <file>` command then checks a template on your computer. It does not need an API key, and it does not use render credits. For more data, see the [agent guide](https://shotstack.io/docs/guide/agents/cli/).

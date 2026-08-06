@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'The examples in this repository obey STANDARDS.md in the root directory. Read that file before you add or change an example. It is written in Simplified Technical English (ASD-STE100), and new example documentation must use the same style. The CI pipeline checks the format with .prettierrc and ruff.toml. Run those checks before you commit.'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
