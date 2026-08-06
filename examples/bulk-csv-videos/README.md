@@ -6,7 +6,7 @@ and track every render in a resumable manifest. The submit loop is implemented t
 in Python. An optional AI step has Claude write each row's headline and text-to-image prompt, which
 the same pipeline validates like any other input.
 
-Companion code for [Generate videos in bulk with an API and an AI agent](https://shotstack.io/learn/bulk-create-videos-from-csv/).
+Companion code for [Generate videos in bulk with an API and an AI agent](https://shotstack.io/learn/bulk-create-videos-from-csv-and-ai/).
 
 ## Requirements
 
