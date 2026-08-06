@@ -36,8 +36,7 @@
                 "y": 0.05
               },
               "transition": {
-                "in": "fade",
-                "out": "fade"
+                "in": "fade"
               }
             }
           ]
@@ -68,8 +67,7 @@
                 "y": 0.2
               },
               "transition": {
-                "in": "fade",
-                "out": "fade"
+                "in": "fade"
               }
             }
           ]
@@ -100,8 +98,7 @@
                 "y": -0.08
               },
               "transition": {
-                "in": "fade",
-                "out": "fade"
+                "in": "fade"
               }
             }
           ]
@@ -124,8 +121,7 @@
               },
               "effect": "zoomInSlow",
               "transition": {
-                "in": "fade",
-                "out": "fade"
+                "in": "fade"
               }
             }
           ]
