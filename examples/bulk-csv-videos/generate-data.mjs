@@ -7,7 +7,7 @@ const imageUrls = [
   'https://shotstack-assets.s3.amazonaws.com/images/slideshow4.jpeg',
   'https://shotstack-assets.s3.amazonaws.com/images/slideshow5.jpeg',
   'https://shotstack-assets.s3.amazonaws.com/images/slideshow6.jpeg',
-  'https://shotstack-assets.s3.amazonaws.com/images/slideshow7.jpeg',
+  'https://shotstack-assets.s3.amazonaws.com/images/slideshow7.jpeg'
 ];
 
 const headlines = [
@@ -15,7 +15,7 @@ const headlines = [
   'Made for everyday use',
   'A customer favorite',
   'Limited release',
-  'Built to last',
+  'Built to last'
 ];
 
 const brandColors = ['#0f766e', '#1d4ed8', '#7c3aed', '#be123c', '#b45309'];
@@ -27,7 +27,7 @@ const preflightRows = [
     headline: 'Longest approved headline checks wrapping before launch',
     price: 'From $199',
     image_url: imageUrls[0],
-    brand_color: brandColors[0],
+    brand_color: brandColors[0]
   },
   {
     row_id: 'product-002',
@@ -35,7 +35,7 @@ const preflightRows = [
     headline: 'New',
     price: '$9.00',
     image_url: imageUrls[1],
-    brand_color: brandColors[1],
+    brand_color: brandColors[1]
   },
   {
     row_id: 'product-003',
@@ -43,11 +43,11 @@ const preflightRows = [
     headline: 'Built for Nairobi, Montréal, and everywhere between',
     price: 'From $49',
     image_url: imageUrls[2],
-    brand_color: brandColors[2],
-  },
+    brand_color: brandColors[2]
+  }
 ];
 
-const csvEscape = (value) => {
+const csvEscape = value => {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
@@ -65,7 +65,7 @@ const rows = Array.from({ length: 100 }, (_, index) => {
     headline: headlines[index % headlines.length],
     price: `$${29 + ((number * 7) % 170)}.00`,
     image_url: imageUrls[index % imageUrls.length],
-    brand_color: brandColors[index % brandColors.length],
+    brand_color: brandColors[index % brandColors.length]
   };
 });
 
@@ -75,14 +75,12 @@ const columns = [
   'headline',
   'price',
   'image_url',
-  'brand_color',
+  'brand_color'
 ];
 
 const csv = [
   columns.join(','),
-  ...rows.map((row) =>
-    columns.map((column) => csvEscape(row[column])).join(','),
-  ),
+  ...rows.map(row => columns.map(column => csvEscape(row[column])).join(','))
 ].join('\n');
 
 await writeFile('products.csv', `${csv}\n`, 'utf8');

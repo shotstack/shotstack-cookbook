@@ -12,7 +12,7 @@ Companion code for [Generate videos in bulk with an API and an AI agent](https:/
 
 - A [Shotstack account](https://dashboard.shotstack.io/register) with your **sandbox** API key
   (dashboard menu under your account name, top right, under **API Keys**)
-- Node.js 18 or later, or Python 3 for the submit loop
+- Node.js 20 or later, or Python 3 for the submit loop
 - Optional, for the AI step: an [Anthropic API key](https://platform.claude.com/)
 
 Sandbox renders are watermarked, and your account needs at least one credit to use the environment.
@@ -25,7 +25,7 @@ cd shotstack-cookbook/examples/bulk-csv-videos
 npm install
 ```
 
-Copy `.env.example` to `.env` and fill in your keys, or export them:
+Set your sandbox key and environment:
 
 ```bash
 export SHOTSTACK_API_KEY="your_sandbox_api_key"
@@ -69,13 +69,25 @@ Remove `SHOTSTACK_ROW_LIMIT` for the full batch. `node bulk-render.mjs summary` 
 equivalent) reads the local manifest without calling any API.
 
 4. Optional AI step — Claude writes each row's headline and image prompt, the script validates them,
-and the render loop runs unchanged on the new file:
+   and the render loop runs unchanged on the new file. Use a separate manifest, because the AI-written
+   rows differ from rows already tracked in `batch-results.json`:
 
 ```bash
 export ANTHROPIC_API_KEY="your_anthropic_api_key"
 node generate-data-ai.mjs
-CSV_PATH=products-ai.csv node bulk-render.mjs submit
+CSV_PATH=products-ai.csv MANIFEST_PATH=batch-results-ai.json node bulk-render.mjs submit
 ```
+
+If your template has a `text-to-image` asset with an `{{IMAGE_PROMPT}}` placeholder, the AI-written
+prompt drives it. Templates without the placeholder ignore the extra field.
+
+## What happens
+
+`submit` validates the CSV, queues one template render per row, and records every render in the
+manifest. `status` polls each render until it is `done` or `failed` and retrieves the hosted video
+URL for finished renders. Each command ends with a status table and the count of hosted videos. The
+first three rows finish in under a minute; the full batch takes several minutes at the default
+one-request-per-second pace.
 
 ## Notes
 
@@ -83,4 +95,6 @@ CSV_PATH=products-ai.csv node bulk-render.mjs submit
   production key and `SHOTSTACK_ENV=v1` before a production run; the ids will differ.
 - The manifest (`batch-results.json`) makes reruns safe: rows with a render id are skipped, and
   only confirmed failures are retried with `SHOTSTACK_RETRY_FAILED=true`.
+- A row marked `unknown` means the process stopped before the API confirmed the request. Check the
+  render dashboard first. To retry the row, delete its entry from the manifest and run `submit` again.
 - Do not run the Node and Python submitters against the same manifest at the same time.

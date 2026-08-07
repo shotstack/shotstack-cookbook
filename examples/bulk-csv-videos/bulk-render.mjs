@@ -16,7 +16,7 @@ const TEMPLATE_ID = process.env.SHOTSTACK_TEMPLATE_ID;
 const CSV_PATH = process.env.CSV_PATH ?? 'products.csv';
 const MANIFEST_PATH = process.env.MANIFEST_PATH ?? 'batch-results.json';
 const REQUEST_INTERVAL_MS = Number(
-  process.env.SHOTSTACK_REQUEST_INTERVAL_MS ?? '1000',
+  process.env.SHOTSTACK_REQUEST_INTERVAL_MS ?? '1000'
 );
 const ROW_LIMIT = Number(process.env.SHOTSTACK_ROW_LIMIT ?? '0');
 const RETRY_FAILED = process.env.SHOTSTACK_RETRY_FAILED === 'true';
@@ -30,37 +30,42 @@ const SERVE_BASE = (
   `https://api.shotstack.io/serve/${ENVIRONMENT}`
 ).replace(/\/$/, '');
 
+const fail = message => {
+  console.error(message);
+  process.exit(1);
+};
+
 if (!['stage', 'v1'].includes(ENVIRONMENT)) {
-  throw new Error('SHOTSTACK_ENV must be stage or v1.');
+  fail('SHOTSTACK_ENV must be stage or v1.');
 }
 
 if (!Number.isFinite(REQUEST_INTERVAL_MS) || REQUEST_INTERVAL_MS < 0) {
-  throw new Error('SHOTSTACK_REQUEST_INTERVAL_MS must be zero or greater.');
+  fail('SHOTSTACK_REQUEST_INTERVAL_MS must be zero or greater.');
 }
 
 if (!Number.isInteger(ROW_LIMIT) || ROW_LIMIT < 0) {
-  throw new Error('SHOTSTACK_ROW_LIMIT must be a non-negative integer.');
+  fail('SHOTSTACK_ROW_LIMIT must be a non-negative integer.');
 }
 
 if (command !== 'summary' && !API_KEY) {
-  throw new Error('Set SHOTSTACK_API_KEY before running this command.');
+  fail('Set SHOTSTACK_API_KEY before running this command.');
 }
 
 if (command === 'submit' && !TEMPLATE_ID) {
-  throw new Error('Set SHOTSTACK_TEMPLATE_ID before submitting renders.');
+  fail('Set SHOTSTACK_TEMPLATE_ID before submitting renders.');
 }
 
-const sleep = (milliseconds) =>
+const sleep = milliseconds =>
   milliseconds > 0
-    ? new Promise((resolve) => setTimeout(resolve, milliseconds))
+    ? new Promise(resolve => setTimeout(resolve, milliseconds))
     : Promise.resolve();
 
-const hashRow = (row) =>
+const hashRow = row =>
   createHash('sha256')
     .update(JSON.stringify(row, Object.keys(row).sort()))
     .digest('hex');
 
-const responseMessage = (body) =>
+const responseMessage = body =>
   body?.response?.error ??
   body?.response?.message ??
   body?.message ??
@@ -93,7 +98,7 @@ async function loadManifest({ create = false } = {}) {
 
     if (manifest.environment !== ENVIRONMENT) {
       throw new Error(
-        `${MANIFEST_PATH} belongs to ${manifest.environment}, not ${ENVIRONMENT}.`,
+        `${MANIFEST_PATH} belongs to ${manifest.environment}, not ${ENVIRONMENT}.`
       );
     }
 
@@ -117,17 +122,30 @@ async function loadManifest({ create = false } = {}) {
       templateId: TEMPLATE_ID,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      rows: [],
+      rows: []
     };
   }
 }
 
 async function loadRows() {
-  const rows = parse(await readFile(CSV_PATH, 'utf8'), {
+  let csvText;
+
+  try {
+    csvText = await readFile(CSV_PATH, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      throw new Error(
+        `Cannot find ${CSV_PATH}. Run node generate-data.mjs first, or set CSV_PATH.`
+      );
+    }
+    throw error;
+  }
+
+  const rows = parse(csvText, {
     bom: true,
     columns: true,
     skip_empty_lines: true,
-    trim: true,
+    trim: true
   });
 
   const requiredColumns = [
@@ -136,7 +154,7 @@ async function loadRows() {
     'headline',
     'price',
     'image_url',
-    'brand_color',
+    'brand_color'
   ];
   const seenIds = new Set();
   const errors = [];
@@ -152,7 +170,7 @@ async function loadRows() {
 
     if (!/^[A-Za-z0-9_-]+$/.test(row.row_id ?? '')) {
       errors.push(
-        `Line ${line}: row_id may contain only letters, numbers, _ and -.`,
+        `Line ${line}: row_id may contain only letters, numbers, _ and -.`
       );
     }
 
@@ -195,13 +213,22 @@ async function loadRows() {
 }
 
 function mergeFields(row) {
-  return [
+  const fields = [
     { find: 'PRODUCT_NAME', replace: row.product_name },
     { find: 'HEADLINE', replace: row.headline },
     { find: 'PRICE', replace: row.price },
     { find: 'IMAGE_URL', replace: row.image_url },
-    { find: 'BRAND_COLOR', replace: row.brand_color },
+    { find: 'BRAND_COLOR', replace: row.brand_color }
   ];
+
+  // The AI data step adds an image_prompt column for templates that use a
+  // text-to-image asset with an {{IMAGE_PROMPT}} placeholder. Templates
+  // without the placeholder ignore the extra merge field.
+  if (row.image_prompt) {
+    fields.push({ find: 'IMAGE_PROMPT', replace: row.image_prompt });
+  }
+
+  return fields;
 }
 
 function retryDelay(response, retryNumber) {
@@ -224,7 +251,7 @@ function retryDelay(response, retryNumber) {
 async function submitTemplate(row) {
   const payload = {
     id: TEMPLATE_ID,
-    merge: mergeFields(row),
+    merge: mergeFields(row)
   };
 
   for (let retry = 0; retry <= MAX_RATE_LIMIT_RETRIES; retry += 1) {
@@ -236,15 +263,15 @@ async function submitTemplate(row) {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          'x-api-key': API_KEY,
+          'x-api-key': API_KEY
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(30_000)
       });
     } catch (error) {
       return {
         kind: 'unknown',
-        error: `No definitive API response: ${error.message}`,
+        error: `No definitive API response: ${error.message}`
       };
     }
 
@@ -255,7 +282,7 @@ async function submitTemplate(row) {
         return {
           kind: 'rejected',
           statusCode: 429,
-          error: responseMessage(body),
+          error: responseMessage(body)
         };
       }
 
@@ -273,14 +300,14 @@ async function submitTemplate(row) {
       return {
         kind: 'rejected',
         statusCode: response.status,
-        error: responseMessage(body),
+        error: responseMessage(body)
       };
     }
 
     return {
       kind: 'unknown',
       statusCode: response.status,
-      error: `Unexpected response: ${responseMessage(body)}`,
+      error: `Unexpected response: ${responseMessage(body)}`
     };
   }
 }
@@ -288,11 +315,12 @@ async function submitTemplate(row) {
 async function submitRows() {
   const rows = await loadRows();
   const manifest = await loadManifest({ create: true });
+  let failures = 0;
 
   console.log(`Validated ${rows.length} rows from ${CSV_PATH}.`);
 
   for (const [index, row] of rows.entries()) {
-    let entry = manifest.rows.find((item) => item.rowId === row.row_id);
+    let entry = manifest.rows.find(item => item.rowId === row.row_id);
 
     if (entry?.status === 'submitting') {
       entry.status = 'unknown';
@@ -314,7 +342,7 @@ async function submitRows() {
     if (entry?.inputHash && entry.inputHash !== currentHash && !canRetry) {
       throw new Error(
         `Row ${row.row_id} changed after its first submission. ` +
-          'Use a new row_id, or retry it only after confirming the previous request failed.',
+          'Use a new row_id, or retry it only after confirming the previous request failed.'
       );
     }
 
@@ -337,7 +365,7 @@ async function submitRows() {
       if (entry.renderId) {
         entry.previousRenderIds = [
           ...(entry.previousRenderIds ?? []),
-          entry.renderId,
+          entry.renderId
         ];
       }
       delete entry.renderId;
@@ -364,34 +392,48 @@ async function submitRows() {
       entry.status = 'queued';
       entry.submittedAt = new Date().toISOString();
       console.log(
-        `[${index + 1}/${rows.length}] ${row.row_id} -> ${result.renderId}`,
+        `[${index + 1}/${rows.length}] ${row.row_id} -> ${result.renderId}`
       );
     } else if (result.kind === 'rejected') {
       entry.status = 'submission_failed';
       entry.statusCode = result.statusCode;
       entry.error = result.error;
+      failures += 1;
       console.error(`[${row.row_id}] rejected: ${result.error}`);
     } else {
       entry.status = 'unknown';
       entry.statusCode = result.statusCode;
       entry.error = result.error;
+      failures += 1;
       console.error(`[${row.row_id}] unknown outcome: ${result.error}`);
     }
 
     await saveManifest(manifest);
+
+    if (result.kind === 'rejected' && [401, 403].includes(result.statusCode)) {
+      console.error(
+        'The API key was rejected. Check SHOTSTACK_API_KEY and SHOTSTACK_ENV, then run submit again.'
+      );
+      break;
+    }
+
     await sleep(REQUEST_INTERVAL_MS);
   }
 
   printSummary(manifest);
+
+  if (failures > 0) {
+    process.exitCode = 1;
+  }
 }
 
 async function getJson(url) {
   const response = await fetch(url, {
     headers: {
       Accept: 'application/json',
-      'x-api-key': API_KEY,
+      'x-api-key': API_KEY
     },
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(30_000)
   });
   const body = await parseResponse(response);
   return { response, body };
@@ -412,7 +454,7 @@ async function updateStatuses() {
     if (entry.status !== 'done') {
       try {
         const { response, body } = await getJson(
-          `${EDIT_BASE}/render/${entry.renderId}?data=false`,
+          `${EDIT_BASE}/render/${entry.renderId}?data=false`
         );
 
         if (response.ok && body?.response?.status) {
@@ -426,7 +468,7 @@ async function updateStatuses() {
           }
         } else {
           console.warn(
-            `[${entry.rowId}] status lookup failed: ${response.status} ${responseMessage(body)}`,
+            `[${entry.rowId}] status lookup failed: ${response.status} ${responseMessage(body)}`
           );
         }
       } catch (error) {
@@ -437,14 +479,14 @@ async function updateStatuses() {
     if (entry.status === 'done' && !entry.hostedUrl) {
       try {
         const { response, body } = await getJson(
-          `${SERVE_BASE}/assets/render/${entry.renderId}`,
+          `${SERVE_BASE}/assets/render/${entry.renderId}`
         );
 
         if (response.ok && Array.isArray(body.data)) {
           const video = body.data.find(
-            (asset) =>
+            asset =>
               asset?.attributes?.status === 'ready' &&
-              asset?.attributes?.filename?.endsWith('.mp4'),
+              asset?.attributes?.filename?.endsWith('.mp4')
           );
           const firstAsset = body.data[0]?.attributes;
 
@@ -477,17 +519,28 @@ function printSummary(manifest) {
   console.table(
     Object.entries(counts)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([status, count]) => ({ status, count })),
+      .map(([status, count]) => ({ status, count }))
   );
   console.log(
-    `Hosted videos ready: ${manifest.rows.filter((row) => row.hostedUrl).length}/${manifest.rows.length}`,
+    `Hosted videos ready: ${manifest.rows.filter(row => row.hostedUrl).length}/${manifest.rows.length}`
   );
 }
 
-if (command === 'submit') {
-  await submitRows();
-} else if (command === 'status') {
-  await updateStatuses();
-} else {
-  printSummary(await loadManifest());
+try {
+  if (command === 'submit') {
+    await submitRows();
+  } else if (command === 'status') {
+    await updateStatuses();
+  } else {
+    printSummary(await loadManifest());
+  }
+} catch (error) {
+  if (error.code === 'ENOENT') {
+    console.error(
+      `Cannot find ${MANIFEST_PATH}. Run node bulk-render.mjs submit first.`
+    );
+  } else {
+    console.error(error instanceof Error ? error.message : error);
+  }
+  process.exitCode = 1;
 }

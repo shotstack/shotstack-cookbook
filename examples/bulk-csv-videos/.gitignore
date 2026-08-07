@@ -1,5 +1,4 @@
 node_modules/
 .env
-products.csv
-products-ai.csv
+products*.csv
 batch-results*.json
