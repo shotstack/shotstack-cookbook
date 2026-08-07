@@ -6,6 +6,7 @@ Clone this repository, or open the directory of the example you want. Each examp
 
 ## Examples
 
+- [first-render](examples/first-render) the very basics: submit an Edit, poll the render status, and print the output URL, in Node.js and Python. Start here if you are new to the API. Companion code for [Render your first video with the Shotstack API](https://shotstack.io/learn/render-your-first-video-shotstack-api/).
 - [instagram-ai-video](examples/instagram-ai-video) generates a script, voiceover and background image with AI, renders a 1080x1920 video, and publishes it as an Instagram Reel. Companion code for [How to automate Instagram posts with AI video](https://shotstack.io/learn/automate-instagram-posts-with-ai-video/).
 - [rapidreels](examples/rapidreels) creates faceless short-form videos using generative AI. [View demo](https://shotstack.io/demos/social-media-video-maker/).
 - [reelestate](examples/reelestate) turns static real estate images into fully edited video slideshows. [View demo](https://shotstack.io/demos/real-estate-video-listing-maker/).
