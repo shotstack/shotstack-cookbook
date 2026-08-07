@@ -10,7 +10,7 @@ Companion code for [Render your first video with the Shotstack API](https://shot
 
 - A [Shotstack account](https://dashboard.shotstack.io/register) and your **sandbox** API key
   (dashboard menu under your account name, top right, under **API Keys**)
-- Node.js 18 or later, or Python 3 with [requests](https://pypi.org/project/requests/)
+- Node.js 20 or later, or Python 3 with [requests](https://pypi.org/project/requests/)
 
 Sandbox renders are watermarked and don't consume credits, but your account needs at least one
 credit to use the environment.
@@ -28,15 +28,12 @@ Set your sandbox key:
 export SHOTSTACK_API_KEY="your_sandbox_api_key"
 ```
 
-Or copy `.env.example` to `.env` and use Node's built-in env-file support (Node run only).
-
 ## Run
 
 Node.js:
 
 ```bash
-node render.mjs             # with SHOTSTACK_API_KEY exported
-node --env-file=.env render.mjs
+node render.mjs
 ```
 
 Python:
@@ -46,7 +43,9 @@ python3 -m pip install requests
 python3 render.py
 ```
 
+## What happens
+
 Both scripts read `edit.json` (a five-second "Hello World" rich-text video), submit it to the
 sandbox render endpoint, poll every five seconds until the render reaches `done` or `failed`, and
-print the temporary output URL. The URL expires after 24 hours; see the guide for retrieving the
-CDN-hosted copy through the Serve API.
+print the temporary output URL. A sandbox render finishes in under a minute. The URL expires after
+24 hours; see the guide for retrieving the CDN-hosted copy through the Serve API.
