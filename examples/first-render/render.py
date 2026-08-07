@@ -27,7 +27,8 @@ def shotstack_request(method, path, api_key, **kwargs):
         body = response.json()
     except requests.exceptions.JSONDecodeError as error:
         raise RuntimeError(
-            f"Shotstack returned a non-JSON response with status {response.status_code}."
+            "Shotstack returned a non-JSON response "
+            f"with status {response.status_code}."
         ) from error
 
     if not response.ok:
@@ -95,6 +96,13 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, RuntimeError, TimeoutError, requests.RequestException) as error:
+    except (
+        OSError,
+        KeyError,
+        ValueError,
+        RuntimeError,
+        TimeoutError,
+        requests.RequestException,
+    ) as error:
         print(error, file=sys.stderr)
         raise SystemExit(1) from error

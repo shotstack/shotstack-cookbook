@@ -7,18 +7,19 @@ const MAX_WAIT_MS = 10 * 60 * 1_000;
 const apiKey = process.env.SHOTSTACK_API_KEY;
 
 if (!apiKey) {
-  throw new Error('Set the SHOTSTACK_API_KEY environment variable first.');
+  console.error('Set the SHOTSTACK_API_KEY environment variable first.');
+  process.exit(1);
 }
 
 async function shotstackRequest(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    signal: options.signal ?? AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(30_000),
     headers: {
       Accept: 'application/json',
       'x-api-key': apiKey,
-      ...options.headers,
-    },
+      ...options.headers
+    }
   });
 
   const responseText = await response.text();
@@ -33,7 +34,7 @@ async function shotstackRequest(path, options = {}) {
   if (!response.ok) {
     const details = body ? JSON.stringify(body) : responseText;
     throw new Error(
-      `Shotstack returned ${response.status} ${response.statusText}: ${details}`,
+      `Shotstack returned ${response.status} ${response.statusText}: ${details}`
     );
   }
 
@@ -48,14 +49,14 @@ async function submitRender(edit) {
   const result = await shotstackRequest('/render', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(edit),
+    body: JSON.stringify(edit)
   });
 
   const renderId = result?.response?.id;
 
   if (!renderId) {
     throw new Error(
-      `The response did not contain a render ID: ${JSON.stringify(result)}`,
+      `The response did not contain a render ID: ${JSON.stringify(result)}`
     );
   }
 
@@ -81,7 +82,7 @@ async function waitForRender(renderId) {
 
     if (render.status === 'failed') {
       throw new Error(
-        render.error || 'The render failed without an error message.',
+        render.error || 'The render failed without an error message.'
       );
     }
 
@@ -93,7 +94,7 @@ async function waitForRender(renderId) {
 
 try {
   const edit = JSON.parse(
-    await readFile(new URL('./edit.json', import.meta.url), 'utf8'),
+    await readFile(new URL('./edit.json', import.meta.url), 'utf8')
   );
   const renderId = await submitRender(edit);
 
