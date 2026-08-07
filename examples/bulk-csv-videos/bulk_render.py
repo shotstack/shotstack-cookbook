@@ -7,11 +7,12 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
-
 
 COMMAND = sys.argv[1] if len(sys.argv) > 1 else "submit"
 VALID_COMMANDS = {"submit", "status", "summary"}
@@ -118,6 +119,12 @@ def load_manifest(create=False):
 
 
 def load_rows():
+    if not CSV_PATH.exists():
+        raise FileNotFoundError(
+            f"Cannot find {CSV_PATH}. Run node generate-data.mjs first, "
+            "or set CSV_PATH."
+        )
+
     with CSV_PATH.open(newline="", encoding="utf-8-sig") as csv_file:
         rows = list(csv.DictReader(csv_file))
 
@@ -174,13 +181,30 @@ def load_rows():
 
 
 def merge_fields(row):
-    return [
+    fields = [
         {"find": "PRODUCT_NAME", "replace": row["product_name"]},
         {"find": "HEADLINE", "replace": row["headline"]},
         {"find": "PRICE", "replace": row["price"]},
         {"find": "IMAGE_URL", "replace": row["image_url"]},
         {"find": "BRAND_COLOR", "replace": row["brand_color"]},
     ]
+
+    # The AI data step adds an image_prompt column for templates that use a
+    # text-to-image asset with an {{IMAGE_PROMPT}} placeholder. Templates
+    # without the placeholder ignore the extra merge field.
+    if row.get("image_prompt"):
+        fields.append({"find": "IMAGE_PROMPT", "replace": row["image_prompt"]})
+
+    return fields
+
+
+def parse_json_body(text):
+    if not text:
+        return {}
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"message": text}
 
 
 def request_json(method, url, payload=None):
@@ -196,22 +220,29 @@ def request_json(method, url, payload=None):
 
     try:
         with urlopen(request, timeout=30) as response:
-            text = response.read().decode()
-            body = json.loads(text) if text else {}
+            body = parse_json_body(response.read().decode())
             return response.status, body, response.headers
     except HTTPError as error:
-        text = error.read().decode()
-        try:
-            body = json.loads(text) if text else {}
-        except json.JSONDecodeError:
-            body = {"message": text}
+        body = parse_json_body(error.read().decode())
         return error.code, body, error.headers
 
 
 def retry_delay(headers, retry_number):
     retry_after = headers.get("Retry-After") if headers else None
+
     if retry_after and retry_after.isdigit():
         return int(retry_after)
+
+    if retry_after:
+        try:
+            date_delay = (
+                parsedate_to_datetime(retry_after) - datetime.now(timezone.utc)
+            ).total_seconds()
+            if date_delay > 0:
+                return date_delay
+        except (TypeError, ValueError):
+            pass
+
     return 60 * (2**retry_number)
 
 
@@ -266,6 +297,7 @@ def submit_template(row):
 def submit_rows():
     rows = load_rows()
     manifest = load_manifest(create=True)
+    failures = 0
     print(f"Validated {len(rows)} rows from {CSV_PATH}.")
 
     for index, row in enumerate(rows, start=1):
@@ -364,6 +396,7 @@ def submit_rows():
             entry["status"] = "submission_failed"
             entry["statusCode"] = result.get("statusCode")
             entry["error"] = result["error"]
+            failures += 1
             print(
                 f"[{row['row_id']}] rejected: {result['error']}",
                 file=sys.stderr,
@@ -372,15 +405,28 @@ def submit_rows():
             entry["status"] = "unknown"
             entry["statusCode"] = result.get("statusCode")
             entry["error"] = result["error"]
+            failures += 1
             print(
                 f"[{row['row_id']}] unknown outcome: {result['error']}",
                 file=sys.stderr,
             )
 
         save_manifest(manifest)
+
+        if result["kind"] == "rejected" and result.get("statusCode") in {401, 403}:
+            print(
+                "The API key was rejected. Check SHOTSTACK_API_KEY and "
+                "SHOTSTACK_ENV, then run submit again.",
+                file=sys.stderr,
+            )
+            break
+
         sleep_between_requests()
 
     print_summary(manifest)
+
+    if failures > 0:
+        raise SystemExit(1)
 
 
 def update_statuses():
@@ -474,9 +520,23 @@ def print_summary(manifest):
     print(f"Hosted videos ready: {hosted}/{len(manifest['rows'])}")
 
 
-if COMMAND == "submit":
-    submit_rows()
-elif COMMAND == "status":
-    update_statuses()
-else:
-    print_summary(load_manifest())
+try:
+    if COMMAND == "submit":
+        submit_rows()
+    elif COMMAND == "status":
+        update_statuses()
+    else:
+        print_summary(load_manifest())
+except FileNotFoundError as error:
+    if str(error) == str(MANIFEST_PATH):
+        print(
+            f"Cannot find {MANIFEST_PATH}. Run python3 bulk_render.py submit "
+            "first.",
+            file=sys.stderr,
+        )
+    else:
+        print(error, file=sys.stderr)
+    raise SystemExit(1) from error
+except (OSError, ValueError, RuntimeError) as error:
+    print(error, file=sys.stderr)
+    raise SystemExit(1) from error

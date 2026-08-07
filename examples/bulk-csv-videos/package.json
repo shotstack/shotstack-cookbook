@@ -4,8 +4,11 @@
   "private": true,
   "description": "Render one video per CSV row from a single Shotstack template, with an optional AI data step",
   "type": "module",
+  "scripts": {
+    "format": "npx prettier@3 --write ."
+  },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "csv-parse": "^7.0.2"
