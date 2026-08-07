@@ -1,0 +1,4 @@
+node_modules/
+.env
+products*.csv
+batch-results*.json
