@@ -20,7 +20,11 @@ To make a new example, copy the `examples/_template/` directory.
 
 - Read the API key from an environment variable.
 - Do not put a key in the code. Do not print a key. Do not commit a key.
-- Add a `.env.example` file. Put example values in it.
+- Add a `.env.example` file. Leave each value empty. Put a comment above each variable with the URL where
+  the user gets it. A value that is not empty passes the check for a missing key. Then the example stops
+  with an API error, not with your message.
+- Tell the user in the README how to load the file. Use `export` commands. If the example is only in
+  Node.js and has a `package.json`, you can use `node --env-file=.env` instead.
 - For a Next.js example, name the file `.env.local.example`. Next.js reads `.env.local`.
 - Add the real environment file to `.gitignore`.
 
@@ -46,6 +50,9 @@ must stop with an exit code that is not zero. Do not let the example print a sta
 
 Most users get the first failure, because they forgot to set the API key. Give the most attention to that
 failure.
+
+In Python, catch `Exception`. A list of exception classes is easy to get wrong. `KeyboardInterrupt` is not
+an `Exception`. Catch it also if the example waits in a loop.
 
 ## README structure
 
@@ -77,5 +84,9 @@ You must read the code and run it before you make a pull request. Then do these 
 2. Run the example with an incorrect API key. Read the message.
 3. Do each command in your README, in the correct sequence.
 4. Run the formatter and the linter.
-5. If the example is in two languages, compare the two files. If they are different, one of them is
-   incorrect.
+5. If the example is in two languages, run both with these inputs:
+   - no API key
+   - an incorrect API key
+   - an input file with a malformed row
+
+   The messages must be the same. If they are different, one of the files is incorrect.
