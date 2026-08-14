@@ -221,9 +221,9 @@ function mergeFields(row) {
     { find: 'BRAND_COLOR', replace: row.brand_color }
   ];
 
-  // The AI data step adds an image_prompt column for templates that use a
-  // text-to-image asset with an {{IMAGE_PROMPT}} placeholder. Templates
-  // without the placeholder ignore the extra merge field.
+  // The AI data step adds an image_prompt column. template-ai.json uses it: its
+  // image asset takes a prompt instead of a src. template.json has no
+  // {{IMAGE_PROMPT}} placeholder and ignores the extra merge field.
   if (row.image_prompt) {
     fields.push({ find: 'IMAGE_PROMPT', replace: row.image_prompt });
   }

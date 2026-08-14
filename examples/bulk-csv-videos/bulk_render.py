@@ -20,13 +20,26 @@ VALID_COMMANDS = {"submit", "status", "summary"}
 if COMMAND not in VALID_COMMANDS:
     raise SystemExit("Usage: python3 bulk_render.py [submit|status|summary]")
 
+def env_number(name, default):
+    """Read a numeric environment variable.
+
+    Returns None when the value is not a number, so the range check below reports it
+    with the same message the Node script prints. Parsing here with a bare int() would
+    raise before that check and show a traceback.
+    """
+    try:
+        return int(os.environ.get(name, default))
+    except ValueError:
+        return None
+
+
 API_KEY = os.environ.get("SHOTSTACK_API_KEY")
 ENVIRONMENT = os.environ.get("SHOTSTACK_ENV", "stage")
 TEMPLATE_ID = os.environ.get("SHOTSTACK_TEMPLATE_ID")
 CSV_PATH = Path(os.environ.get("CSV_PATH", "products.csv"))
 MANIFEST_PATH = Path(os.environ.get("MANIFEST_PATH", "batch-results.json"))
-REQUEST_INTERVAL_MS = int(os.environ.get("SHOTSTACK_REQUEST_INTERVAL_MS", "1000"))
-ROW_LIMIT = int(os.environ.get("SHOTSTACK_ROW_LIMIT", "0"))
+REQUEST_INTERVAL_MS = env_number("SHOTSTACK_REQUEST_INTERVAL_MS", "1000")
+ROW_LIMIT = env_number("SHOTSTACK_ROW_LIMIT", "0")
 RETRY_FAILED = os.environ.get("SHOTSTACK_RETRY_FAILED") == "true"
 MAX_RATE_LIMIT_RETRIES = 3
 EDIT_BASE = os.environ.get(
@@ -39,10 +52,10 @@ SERVE_BASE = os.environ.get(
 if ENVIRONMENT not in {"stage", "v1"}:
     raise SystemExit("SHOTSTACK_ENV must be stage or v1.")
 
-if REQUEST_INTERVAL_MS < 0:
+if REQUEST_INTERVAL_MS is None or REQUEST_INTERVAL_MS < 0:
     raise SystemExit("SHOTSTACK_REQUEST_INTERVAL_MS must be zero or greater.")
 
-if ROW_LIMIT < 0:
+if ROW_LIMIT is None or ROW_LIMIT < 0:
     raise SystemExit("SHOTSTACK_ROW_LIMIT must be a non-negative integer.")
 
 if COMMAND != "summary" and not API_KEY:
@@ -67,13 +80,33 @@ def row_hash(row):
     return hashlib.sha256(payload).hexdigest()
 
 
+def as_json(value):
+    """Serialise like JSON.stringify in the Node script.
+
+    str() on a dict prints Python syntax with single quotes, so the two scripts
+    report different text for the same API response.
+    """
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+
+
 def response_message(body):
+    """Mirror responseMessage in the Node script, including its fallback to the
+    whole body rather than the nested response object."""
     if not isinstance(body, dict):
-        return str(body)
+        return as_json(body)
+
     response = body.get("response")
     if isinstance(response, dict):
-        return response.get("error") or response.get("message") or str(response)
-    return body.get("message") or str(body)
+        for key in ("error", "message"):
+            value = response.get(key)
+            if value is not None:
+                return value
+
+    message = body.get("message")
+    if message is not None:
+        return message
+
+    return as_json(body)
 
 
 def save_manifest(manifest):
@@ -125,8 +158,36 @@ def load_rows():
             "or set CSV_PATH."
         )
 
+    # Read the CSV the same way the Node script does. Two things matter:
+    #
+    # csv.DictReader keeps surrounding spaces, the Node parser is set to trim them. The
+    # row hash is taken from these values, so untrimmed values hash differently and each
+    # script rejects rows the other submitted.
+    #
+    # DictReader also gives a row with more fields than headers the key None, which is
+    # not sortable against the string keys in row_hash.
     with CSV_PATH.open(newline="", encoding="utf-8-sig") as csv_file:
-        rows = list(csv.DictReader(csv_file))
+        reader = csv.reader(csv_file)
+        try:
+            header = [name.strip() for name in next(reader)]
+        except StopIteration:
+            raise SystemExit(f"{CSV_PATH} has no header row.") from None
+
+        rows = []
+        for line_number, values in enumerate(reader, start=2):
+            if not values:
+                continue
+            if len(values) != len(header):
+                raise SystemExit(
+                    f"Invalid Record Length: columns length is {len(header)}, "
+                    f"got {len(values)} on line {line_number}"
+                )
+            rows.append(
+                {
+                    name: value.strip()
+                    for name, value in zip(header, values, strict=True)
+                }
+            )
 
     required_columns = [
         "row_id",
@@ -189,9 +250,9 @@ def merge_fields(row):
         {"find": "BRAND_COLOR", "replace": row["brand_color"]},
     ]
 
-    # The AI data step adds an image_prompt column for templates that use a
-    # text-to-image asset with an {{IMAGE_PROMPT}} placeholder. Templates
-    # without the placeholder ignore the extra merge field.
+    # The AI data step adds an image_prompt column. template-ai.json uses it: its
+    # image asset takes a prompt instead of a src. template.json has no
+    # {{IMAGE_PROMPT}} placeholder and ignores the extra merge field.
     if row.get("image_prompt"):
         fields.append({"find": "IMAGE_PROMPT", "replace": row["image_prompt"]})
 
@@ -527,6 +588,15 @@ try:
         update_statuses()
     else:
         print_summary(load_manifest())
+except KeyboardInterrupt:
+    # KeyboardInterrupt is not an Exception, and this script sleeps between requests,
+    # so it is easy to hit. The manifest is written after each row, so the next run
+    # picks up where this one stopped.
+    print(
+        "Stopped. Run the same command again to continue.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1) from None
 except FileNotFoundError as error:
     if str(error) == str(MANIFEST_PATH):
         print(
@@ -536,6 +606,10 @@ except FileNotFoundError as error:
         )
     else:
         print(error, file=sys.stderr)
+    raise SystemExit(1) from error
+except Exception as error:
+    # Catch Exception rather than a list of classes. One line, no traceback.
+    print(error, file=sys.stderr)
     raise SystemExit(1) from error
 except (OSError, ValueError, RuntimeError) as error:
     print(error, file=sys.stderr)

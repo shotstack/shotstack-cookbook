@@ -107,6 +107,12 @@ try {
   fail(`Could not reach the Anthropic API: ${error.message}`);
 }
 
+if (response.status === 401) {
+  fail(
+    'ANTHROPIC_API_KEY is not valid. Get a key at https://platform.claude.com/.'
+  );
+}
+
 if (!response.ok) {
   fail(`Anthropic API error ${response.status}: ${await response.text()}`);
 }
@@ -142,7 +148,7 @@ for (const row of rows) {
     row.image_prompt = imagePrompt;
     prompts += 1;
   } else {
-    // Deterministic fallback so the text-to-image asset always has a prompt.
+    // Deterministic fallback so the image asset always has a prompt.
     row.image_prompt = `Studio product photo of ${row.product_name} on a plain background`;
   }
 }
