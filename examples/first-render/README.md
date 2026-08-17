@@ -10,7 +10,8 @@ Companion code for [Render your first video with the Shotstack API](https://shot
 
 - A [Shotstack account](https://dashboard.shotstack.io/register) and your **sandbox** API key
   (dashboard menu under your account name, top right, under **API Keys**)
-- Node.js 20 or later, or Python 3 with [requests](https://pypi.org/project/requests/)
+- Node.js 20 or later, or Python 3.8 or later with
+  [requests](https://pypi.org/project/requests/) 2 or later
 
 Sandbox renders are watermarked and don't consume credits, but your account needs at least one
 credit to use the environment.
@@ -22,10 +23,18 @@ git clone https://github.com/shotstack/shotstack-cookbook.git
 cd shotstack-cookbook/examples/first-render
 ```
 
-Set your sandbox key:
+Copy the environment file. Add your sandbox key to `.env`.
 
 ```bash
-export SHOTSTACK_API_KEY="your_sandbox_api_key"
+cp .env.example .env
+```
+
+Load the file into your shell. Do this in each new terminal:
+
+```bash
+set -a
+source .env
+set +a
 ```
 
 ## Run

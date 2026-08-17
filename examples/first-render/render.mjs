@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 
+// The sandbox environment. The API names it "stage".
 const API_BASE_URL = 'https://api.shotstack.io/edit/stage';
 const POLL_INTERVAL_MS = 5_000;
 const MAX_WAIT_MS = 10 * 60 * 1_000;
@@ -12,15 +13,25 @@ if (!apiKey) {
 }
 
 async function shotstackRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    signal: AbortSignal.timeout(30_000),
-    headers: {
-      Accept: 'application/json',
-      'x-api-key': apiKey,
-      ...options.headers
-    }
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      signal: AbortSignal.timeout(30_000),
+      headers: {
+        Accept: 'application/json',
+        'x-api-key': apiKey,
+        ...options.headers
+      }
+    });
+  } catch (error) {
+    throw new Error(
+      'Could not reach the Shotstack API. ' +
+        'Check your network connection and try again.',
+      { cause: error }
+    );
+  }
 
   const responseText = await response.text();
   let body = null;
@@ -28,18 +39,20 @@ async function shotstackRequest(path, options = {}) {
   try {
     body = JSON.parse(responseText);
   } catch {
-    // The error below includes the raw body when Shotstack does not return JSON.
+    // Handled below: an error response falls back to the raw body text, and
+    // a success response that is not JSON gets its own message.
   }
 
   if (!response.ok) {
-    const details = body ? JSON.stringify(body) : responseText;
-    throw new Error(
-      `Shotstack returned ${response.status} ${response.statusText}: ${details}`
-    );
+    const detail =
+      body?.errors?.[0]?.detail || (body ? JSON.stringify(body) : responseText);
+    throw new Error(`Shotstack returned ${response.status}: ${detail}`);
   }
 
-  if (!body) {
-    throw new Error('Shotstack returned an unexpected non-JSON response.');
+  if (!body || typeof body !== 'object') {
+    throw new Error(
+      `Shotstack returned a non-JSON response with status ${response.status}.`
+    );
   }
 
   return body;
@@ -52,7 +65,7 @@ async function submitRender(edit) {
     body: JSON.stringify(edit)
   });
 
-  const renderId = result?.response?.id;
+  const renderId = result.response?.id;
 
   if (!renderId) {
     throw new Error(
@@ -68,15 +81,18 @@ async function waitForRender(renderId) {
 
   while (Date.now() - startedAt < MAX_WAIT_MS) {
     const result = await shotstackRequest(`/render/${renderId}`);
-    const render = result?.response;
+    const render = result.response || {};
 
-    if (!render?.status) {
+    if (!render.status) {
       throw new Error(`Unexpected status response: ${JSON.stringify(result)}`);
     }
 
     console.log(`Render status: ${render.status}`);
 
     if (render.status === 'done') {
+      if (!render.url) {
+        throw new Error('The render finished without an output URL.');
+      }
       return render;
     }
 
@@ -89,7 +105,9 @@ async function waitForRender(renderId) {
     await delay(POLL_INTERVAL_MS);
   }
 
-  throw new Error(`Render ${renderId} did not finish within 10 minutes.`);
+  throw new Error(
+    `Render ${renderId} did not finish within ${MAX_WAIT_MS / 60_000} minutes.`
+  );
 }
 
 try {
