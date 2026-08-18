@@ -108,8 +108,7 @@
             {
               "asset": {
                 "type": "image",
-                "prompt": "{{IMAGE_PROMPT}}",
-                "aspectRatio": "1:1"
+                "prompt": "{{IMAGE_PROMPT}}"
               },
               "start": 0,
               "length": 3,

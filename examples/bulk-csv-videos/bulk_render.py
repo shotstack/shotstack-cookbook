@@ -158,14 +158,8 @@ def load_rows():
             "or set CSV_PATH."
         )
 
-    # Read the CSV the same way the Node script does. Two things matter:
-    #
-    # csv.DictReader keeps surrounding spaces, the Node parser is set to trim them. The
-    # row hash is taken from these values, so untrimmed values hash differently and each
-    # script rejects rows the other submitted.
-    #
-    # DictReader also gives a row with more fields than headers the key None, which is
-    # not sortable against the string keys in row_hash.
+    # csv.reader, not DictReader: values must be trimmed before hashing to match the
+    # Node script, and DictReader mis-keys ragged rows.
     with CSV_PATH.open(newline="", encoding="utf-8-sig") as csv_file:
         reader = csv.reader(csv_file)
         try:
@@ -185,7 +179,7 @@ def load_rows():
             rows.append(
                 {
                     name: value.strip()
-                    for name, value in zip(header, values, strict=True)
+                    for name, value in zip(header, values)
                 }
             )
 
@@ -608,9 +602,6 @@ except FileNotFoundError as error:
         print(error, file=sys.stderr)
     raise SystemExit(1) from error
 except Exception as error:
-    # Catch Exception rather than a list of classes. One line, no traceback.
-    print(error, file=sys.stderr)
-    raise SystemExit(1) from error
-except (OSError, ValueError, RuntimeError) as error:
+    # Broad on purpose: any unexpected error prints one line, no traceback.
     print(error, file=sys.stderr)
     raise SystemExit(1) from error
