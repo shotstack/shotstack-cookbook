@@ -6,6 +6,7 @@ Clone this repository, or open the directory of the example you want. Each examp
 
 ## Examples
 
+- [bulk-csv-videos](examples/bulk-csv-videos) renders one video per row of a CSV from a single template with merge fields, tracked in a resumable manifest, with an optional AI step where Claude writes each row's headline and image prompt. Companion code for [Generate videos in bulk with an API and an AI agent](https://shotstack.io/learn/bulk-create-videos-from-csv-and-ai/).
 - [first-render](examples/first-render) the very basics: submit an Edit, poll the render status, and print the output URL, in Node.js and Python. Start here if you are new to the API. Companion code for [Render your first video with the Shotstack API](https://shotstack.io/learn/render-your-first-video-shotstack-api/).
 - [instagram-ai-video](examples/instagram-ai-video) generates a script, voiceover and background image with AI, renders a 1080x1920 video, and publishes it as an Instagram Reel. Companion code for [How to automate Instagram posts with AI video](https://shotstack.io/learn/automate-instagram-posts-with-ai-video/).
 - [rapidreels](examples/rapidreels) creates faceless short-form videos using generative AI. [View demo](https://shotstack.io/demos/social-media-video-maker/).

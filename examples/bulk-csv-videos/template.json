@@ -1,0 +1,138 @@
+{
+  "name": "Bulk catalog promo - 3 seconds",
+  "template": {
+    "timeline": {
+      "background": "{{BRAND_COLOR}}",
+      "tracks": [
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "rich-text",
+                "text": "{{PRICE}}",
+                "font": {
+                  "family": "Montserrat",
+                  "size": 52,
+                  "weight": 800,
+                  "color": "#111827"
+                },
+                "background": {
+                  "color": "#ffffff",
+                  "opacity": 1,
+                  "borderRadius": 24
+                },
+                "padding": 20,
+                "align": {
+                  "horizontal": "center",
+                  "vertical": "middle"
+                }
+              },
+              "start": 0,
+              "length": 3,
+              "width": 320,
+              "height": 120,
+              "position": "bottom",
+              "offset": {
+                "y": 0.05
+              },
+              "transition": {
+                "in": "fade"
+              }
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "rich-text",
+                "text": "{{HEADLINE}}",
+                "font": {
+                  "family": "Montserrat",
+                  "size": 38,
+                  "weight": 600,
+                  "color": "#ffffff"
+                },
+                "align": {
+                  "horizontal": "center",
+                  "vertical": "middle"
+                }
+              },
+              "start": 0,
+              "length": 3,
+              "width": 620,
+              "height": 120,
+              "position": "bottom",
+              "offset": {
+                "y": 0.2
+              },
+              "transition": {
+                "in": "fade"
+              }
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "rich-text",
+                "text": "{{PRODUCT_NAME}}",
+                "font": {
+                  "family": "Montserrat",
+                  "size": 58,
+                  "weight": 800,
+                  "color": "#ffffff"
+                },
+                "align": {
+                  "horizontal": "center",
+                  "vertical": "middle"
+                }
+              },
+              "start": 0,
+              "length": 3,
+              "width": 620,
+              "height": 180,
+              "position": "top",
+              "offset": {
+                "y": -0.08
+              },
+              "transition": {
+                "in": "fade"
+              }
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "image",
+                "src": "{{IMAGE_URL}}"
+              },
+              "start": 0,
+              "length": 3,
+              "width": 560,
+              "height": 560,
+              "fit": "crop",
+              "position": "center",
+              "offset": {
+                "y": 0.04
+              },
+              "effect": "zoomInSlow",
+              "transition": {
+                "in": "fade"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "output": {
+      "format": "mp4",
+      "resolution": "hd",
+      "aspectRatio": "9:16",
+      "fps": 25
+    }
+  }
+}
