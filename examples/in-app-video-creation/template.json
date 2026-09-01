@@ -1,0 +1,72 @@
+{
+  "name": "In-app promo template",
+  "template": {
+    "timeline": {
+      "background": "#000000",
+      "tracks": [
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "rich-text",
+                "text": "{{ HEADLINE }}",
+                "font": {
+                  "family": "{{ FONT }}",
+                  "size": 48,
+                  "weight": 700,
+                  "color": "#ffffff"
+                },
+                "stroke": {
+                  "width": 3,
+                  "color": "#000000"
+                },
+                "align": {
+                  "horizontal": "center",
+                  "vertical": "middle"
+                }
+              },
+              "start": 0.5,
+              "length": 4.5,
+              "width": 1000,
+              "height": 260
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "video",
+                "src": "{{ FOOTAGE }}"
+              },
+              "start": 0,
+              "length": 5,
+              "fit": "crop"
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "audio",
+                "src": "https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/moment.mp3",
+                "volume": 0.35,
+                "effect": "fadeOut"
+              },
+              "start": 0,
+              "length": "end"
+            }
+          ]
+        }
+      ]
+    },
+    "output": {
+      "format": "mp4",
+      "size": {
+        "width": 1280,
+        "height": 720
+      }
+    }
+  }
+}
