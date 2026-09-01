@@ -69,11 +69,20 @@ const json = (res, code, body) => {
   res.end(JSON.stringify(body));
 };
 
+const MAX_BODY_BYTES = 1024 * 1024; // an edit is small; cap it so a huge POST can't grow the heap
+
 const readBody = req =>
-  new Promise(resolve => {
+  new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', c => (body += c));
+    req.on('data', c => {
+      body += c;
+      if (body.length > MAX_BODY_BYTES) {
+        reject(new Error('request body too large'));
+        req.destroy();
+      }
+    });
     req.on('end', () => resolve(body));
+    req.on('error', reject);
   });
 
 /** Reduce an API error response to one line the user can act on. */
@@ -151,6 +160,19 @@ function withinRateLimit(userId) {
 const PRIVATE_V4 =
   /^(0\.|10\.|127\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/;
 
+function isPrivateAddress(address) {
+  // An IPv4-mapped IPv6 address (::ffff:169.254.169.254) hides a v4 address; unwrap it.
+  const v4 = address.replace(/^::ffff:/i, '');
+  if (PRIVATE_V4.test(v4)) return true;
+  const a = address.toLowerCase();
+  return (
+    a === '::1' || // loopback
+    a.startsWith('fc') || // unique local, fc00::/7
+    a.startsWith('fd') ||
+    a.startsWith('fe80') // link-local
+  );
+}
+
 async function validateAssetUrl(raw) {
   let url;
   try {
@@ -165,11 +187,7 @@ async function validateAssetUrl(raw) {
   // point at a private address.
   try {
     const { address } = await lookup(url.hostname);
-    if (
-      PRIVATE_V4.test(address) ||
-      address === '::1' ||
-      address.startsWith('fd')
-    ) {
+    if (isPrivateAddress(address)) {
       return { ok: false, reason: 'resolves to a private address' };
     }
   } catch {
@@ -185,7 +203,9 @@ async function validateAssetUrl(raw) {
 
   if (!head.ok) return { ok: false, reason: `responded ${head.status}` };
 
-  const size = Number(head.headers.get('content-length') ?? 0);
+  // A missing content-length (chunked responses) means we can't size the asset
+  // here, so it passes this check; the render itself still enforces plan limits.
+  const size = Number(head.headers.get('content-length'));
   if (size > MAX_ASSET_BYTES) {
     return { ok: false, reason: `too large (${Math.round(size / 1e6)} MB)` };
   }
@@ -199,7 +219,9 @@ function collectUrls(node, urls = []) {
     node.forEach(n => collectUrls(n, urls));
   } else if (node && typeof node === 'object') {
     Object.values(node).forEach(v => collectUrls(v, urls));
-  } else if (typeof node === 'string' && /^https?:\/\//i.test(node)) {
+  } else if (typeof node === 'string' && /^\s*https?:\/\//i.test(node)) {
+    // Match leading whitespace too, so " https://…" can't skip validation and
+    // then be submitted verbatim. new URL() normalizes the surrounding space.
     urls.push(node);
   }
   return urls;
@@ -322,15 +344,22 @@ async function handle(req, res) {
       return;
     }
     const row = renders.find(r => r.renderId === payload.id);
+    if (!row) return;
 
-    // Failures fire this hook too. Branch on status, don't assume a url.
-    if (payload.status === 'failed') {
-      if (row) row.status = 'failed';
-      console.error(`render ${payload.id} failed: ${payload.error}`);
-    } else {
-      if (row) Object.assign(row, { status: payload.status, url: payload.url });
-      console.log(`render ${payload.id} done: ${payload.url}`);
-    }
+    // The webhook body is unauthenticated: anyone who can reach this URL can
+    // POST it. Treat it only as a signal to re-fetch the render from the API
+    // with our key, so a forged payload can't write an attacker's url onto a
+    // user's render.
+    const verified = await fetch(`${API}/render/${payload.id}`, { headers })
+      .then(r => (r.ok ? r.json() : null))
+      .catch(() => null);
+    if (!verified) return;
+
+    const { status, url: renderUrl, error } = verified.response;
+    Object.assign(row, { status, url: renderUrl ?? null });
+    if (status === 'failed')
+      console.error(`render ${payload.id} failed: ${error}`);
+    else console.log(`render ${payload.id} ${status}: ${renderUrl ?? ''}`);
     return;
   }
 

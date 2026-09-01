@@ -85,15 +85,16 @@ async function mountEditor() {
   return { edit, canvas, ui, timeline, controls };
 }
 
-try {
-  await mountEditor();
-} catch (err) {
+// Mount without blocking. The editor loads assets over the network, and a
+// top-level await here would leave the form and headless handlers below
+// unregistered until it finished, so those tabs would do nothing meanwhile.
+mountEditor().catch(err => {
   // The SDK renders through WebGL and throws WebGLUnsupportedError where it
   // isn't available. Locked-down and virtualized browsers land here.
   editorStatus.textContent =
     "The editor can't run in this browser. Use the Quick form tab instead.";
   console.error(err);
-}
+});
 
 document
   .getElementById('render-from-editor')
@@ -189,6 +190,22 @@ document
                     fit: 'crop'
                   }
                 ]
+              },
+              {
+                // The same music the editor and form paths use, so all three
+                // produce the same video rather than a silent one here.
+                clips: [
+                  {
+                    asset: {
+                      type: 'audio',
+                      src: 'https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/moment.mp3',
+                      volume: 0.35,
+                      effect: 'fadeOut'
+                    },
+                    start: 0,
+                    length: 'end'
+                  }
+                ]
               }
             ]
           },
@@ -223,8 +240,15 @@ async function submitRender(payload) {
     body: JSON.stringify(payload)
   });
 
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error ?? res.statusText);
+  // A 500 from the Vite proxy when the render server is down has an empty body,
+  // so read defensively rather than assuming JSON.
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.id) {
+    throw new Error(
+      body?.error ??
+        `${res.status}. Is the render proxy running? Start it with npm run server.`
+    );
+  }
   return body.id;
 }
 
@@ -237,8 +261,11 @@ async function pollAndShow(renderId, statusEl) {
     await new Promise(r => setTimeout(r, 3000));
 
     const res = await fetch(`/api/render/${renderId}`);
-    const { status, url, error } = await res.json();
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok)
+      throw new Error(body.error ?? `status check failed (${res.status})`);
 
+    const { status, url, error } = body;
     statusEl.textContent = `${status}…`;
 
     if (status === 'done') {
@@ -259,3 +286,22 @@ function addToGallery(url) {
   video.controls = true;
   document.getElementById('gallery').prepend(video);
 }
+
+// On load, show this user's finished renders. The proxy records the owner of
+// every render, so /api/renders returns only theirs, and the gallery survives
+// a page reload instead of only filling as renders finish this session.
+async function loadGallery() {
+  try {
+    const rows = await fetch('/api/renders').then(r => (r.ok ? r.json() : []));
+    for (const row of rows.reverse()) {
+      const render = await fetch(`/api/render/${row.renderId}`)
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null);
+      if (render?.status === 'done' && render.url) addToGallery(render.url);
+    }
+  } catch {
+    // The gallery just starts empty if the proxy is unreachable.
+  }
+}
+
+loadGallery();
