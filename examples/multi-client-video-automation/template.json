@@ -1,0 +1,76 @@
+{
+  "name": "Client promo v1",
+  "template": {
+    "timeline": {
+      "background": "#000000",
+      "tracks": [
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "rich-text",
+                "text": "{{ HEADLINE }}",
+                "font": {
+                  "family": "{{ FONT }}",
+                  "size": 48,
+                  "weight": 700,
+                  "color": "#ffffff"
+                },
+                "stroke": { "width": 3, "color": "#000000" },
+                "align": { "horizontal": "center", "vertical": "middle" },
+                "animation": { "preset": "fadeIn", "duration": 1 }
+              },
+              "start": 0.5,
+              "length": 4.5,
+              "width": 1000,
+              "height": 260
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": { "type": "svg", "src": "{{ BRAND_MARK }}" },
+              "start": 0.5,
+              "length": 4.5,
+              "width": 120,
+              "height": 120,
+              "fit": "contain",
+              "position": "topLeft",
+              "offset": { "x": 0.06, "y": -0.06 }
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": { "type": "video", "src": "{{ FOOTAGE }}" },
+              "start": 0,
+              "length": 5,
+              "fit": "crop",
+              "effect": "zoomIn"
+            }
+          ]
+        },
+        {
+          "clips": [
+            {
+              "asset": {
+                "type": "audio",
+                "src": "{{ MUSIC }}",
+                "volume": 0.35,
+                "effect": "fadeOut"
+              },
+              "start": 0,
+              "length": "end"
+            }
+          ]
+        }
+      ]
+    },
+    "output": {
+      "format": "mp4",
+      "size": { "width": "{{ WIDTH }}", "height": "{{ HEIGHT }}" }
+    }
+  }
+}
