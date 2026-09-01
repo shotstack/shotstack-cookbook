@@ -79,6 +79,6 @@ URL. A sandbox render finishes in under a minute.
 
 `renders.jsonl` only appends. Delete the file to start a new batch.
 
-The scripts call the sandbox endpoint. For a production run, change the `API` constant in
-`render.mjs` and `status.mjs` to `https://api.shotstack.io/edit/v1`, use your production key, and
-re-create the template with that key. Templates belong to the environment they were created in.
+The scripts render in the sandbox by default. To render in production, set `SHOTSTACK_ENV=v1` and
+put your production key in `.env`. Re-create the template with that key. Templates belong to the
+environment they were created in, and the ids differ.

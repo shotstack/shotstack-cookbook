@@ -5,12 +5,26 @@ if (!process.env.SHOTSTACK_API_KEY) {
   process.exit(1);
 }
 
-const API = 'https://api.shotstack.io/edit/stage';
+const ENV = process.env.SHOTSTACK_ENV ?? 'stage';
+if (!['stage', 'v1'].includes(ENV)) {
+  console.error('SHOTSTACK_ENV must be stage or v1.');
+  process.exit(1);
+}
+const API = `https://api.shotstack.io/edit/${ENV}`;
 
 for (const row of await db.renders.all()) {
-  const res = await fetch(`${API}/render/${row.renderId}`, {
-    headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
-  });
+  let res;
+  try {
+    res = await fetch(`${API}/render/${row.renderId}`, {
+      headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
+    });
+  } catch {
+    console.error(
+      `${row.clientId} ${row.variant ?? ''}: the network request failed. Check your connection and run again.`
+    );
+    process.exitCode = 1;
+    continue;
+  }
 
   if (!res.ok) {
     console.error(

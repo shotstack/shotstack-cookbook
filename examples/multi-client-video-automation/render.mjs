@@ -8,13 +8,21 @@ if (!process.env.SHOTSTACK_API_KEY || !process.env.SHOTSTACK_TEMPLATE_ID) {
   process.exit(1);
 }
 
-const API = 'https://api.shotstack.io/edit/stage';
+const ENV = process.env.SHOTSTACK_ENV ?? 'stage';
+if (!['stage', 'v1'].includes(ENV)) {
+  console.error('SHOTSTACK_ENV must be stage or v1.');
+  process.exit(1);
+}
+const API = `https://api.shotstack.io/edit/${ENV}`;
 
 /** Reduce an API error response to one line the user can act on. */
 async function apiError(res) {
   const text = await res.text();
   try {
-    return JSON.parse(text).errors?.[0]?.detail ?? text;
+    const body = JSON.parse(text);
+    return (
+      body.errors?.[0]?.detail ?? body.response?.error ?? body.message ?? text
+    );
   } catch {
     return text;
   }
