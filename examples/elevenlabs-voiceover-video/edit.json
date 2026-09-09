@@ -1,0 +1,53 @@
+{
+  "timeline": {
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-caption",
+              "src": "alias://voiceover",
+              "font": { "size": 36, "color": "#ffffff" },
+              "background": {
+                "color": "#000000",
+                "opacity": 0.6,
+                "padding": 16,
+                "borderRadius": 8
+              }
+            },
+            "start": 0,
+            "length": "end",
+            "width": 960,
+            "height": 150,
+            "fit": "none",
+            "position": "bottom",
+            "offset": { "y": 0.05 }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "alias": "voiceover",
+            "asset": { "type": "audio", "src": "{{VOICEOVER_URL}}" },
+            "start": 0,
+            "length": "auto"
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "video",
+              "src": "https://shotstack-assets.s3.amazonaws.com/footage/city-timelapse.mp4"
+            },
+            "start": 0,
+            "length": "end"
+          }
+        ]
+      }
+    ]
+  },
+  "output": { "format": "mp4", "resolution": "hd" }
+}
