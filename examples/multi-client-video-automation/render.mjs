@@ -8,7 +8,7 @@ if (!process.env.SHOTSTACK_API_KEY || !process.env.SHOTSTACK_TEMPLATE_ID) {
   process.exit(1);
 }
 
-const ENV = process.env.SHOTSTACK_ENV ?? 'stage';
+const ENV = process.env.SHOTSTACK_ENV || 'stage'; // '' from .env falls back too
 if (!['stage', 'v1'].includes(ENV)) {
   console.error('SHOTSTACK_ENV must be stage or v1.');
   process.exit(1);
@@ -29,17 +29,30 @@ async function apiError(res) {
 }
 
 async function renderVariant(clientId, client, variant) {
-  const res = await fetch(`${API}/templates/render`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.SHOTSTACK_API_KEY
-    },
-    body: JSON.stringify({
-      id: client.templateId,
-      merge: mergeFieldsFor(client, variant)
-    })
-  });
+  let res;
+  try {
+    res = await fetch(`${API}/templates/render`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.SHOTSTACK_API_KEY
+      },
+      body: JSON.stringify({
+        id: client.templateId,
+        merge: mergeFieldsFor(client, variant)
+      }),
+      signal: AbortSignal.timeout(30_000)
+    });
+  } catch {
+    throw new Error(
+      `${clientId}/${variant.name}: the network request failed. Check your connection and run again.`
+    );
+  }
+
+  if (res.status === 401 || res.status === 403)
+    throw new Error(
+      `${clientId}/${variant.name}: the API rejected the key (${res.status}). Check SHOTSTACK_API_KEY and SHOTSTACK_ENV.`
+    );
 
   if (!res.ok)
     throw new Error(
@@ -78,7 +91,14 @@ async function renderAll(concurrency = 10) {
   return results;
 }
 
-const results = await renderAll();
+let results;
+try {
+  results = await renderAll();
+} catch (err) {
+  // Only db.mjs throws here: renders.jsonl could not be written.
+  console.error(err.message);
+  process.exit(1);
+}
 
 const rejected = results.filter(r => r.status === 'rejected');
 for (const r of rejected) console.error(r.reason.message);

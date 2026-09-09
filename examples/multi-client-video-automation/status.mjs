@@ -5,18 +5,32 @@ if (!process.env.SHOTSTACK_API_KEY) {
   process.exit(1);
 }
 
-const ENV = process.env.SHOTSTACK_ENV ?? 'stage';
+const ENV = process.env.SHOTSTACK_ENV || 'stage'; // '' from .env falls back too
 if (!['stage', 'v1'].includes(ENV)) {
   console.error('SHOTSTACK_ENV must be stage or v1.');
   process.exit(1);
 }
 const API = `https://api.shotstack.io/edit/${ENV}`;
 
-for (const row of await db.renders.all()) {
+let rows;
+try {
+  rows = await db.renders.all();
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
+
+if (rows.length === 0) {
+  console.log('No renders recorded yet. Run node render.mjs first.');
+  process.exit(0);
+}
+
+for (const row of rows) {
   let res;
   try {
     res = await fetch(`${API}/render/${row.renderId}`, {
-      headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
+      headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY },
+      signal: AbortSignal.timeout(30_000)
     });
   } catch {
     console.error(

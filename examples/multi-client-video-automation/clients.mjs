@@ -7,7 +7,7 @@ export const clients = {
     headline: 'Twelve new listings this week.',
     font: 'Montserrat',
     footage:
-      'https://shotstack-ingest-api-v1-sources.s3.ap-southeast-2.amazonaws.com/35tqpmb0ya/zzz01m08-qxa25-864e6-zty3t-3sttne/source.mp4',
+      'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/footage/city-timelapse.mp4',
     music:
       'https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/moment.mp3',
     brandMark:
@@ -20,7 +20,7 @@ export const clients = {
     headline: 'Off-season rates end Sunday.',
     font: 'Open Sans',
     footage:
-      'https://shotstack-ingest-api-v1-sources.s3.ap-southeast-2.amazonaws.com/35tqpmb0ya/zzz01m08-qxkz1-xz4yp-pfbj3-14r3s3/source.mp4',
+      'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/footage/beach-overhead.mp4',
     music:
       'https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/spirit.mp3',
     brandMark:
@@ -33,7 +33,7 @@ export const clients = {
     headline: 'New deck drop. Friday.',
     font: 'Permanent Marker',
     footage:
-      'https://shotstack-ingest-api-v1-sources.s3.ap-southeast-2.amazonaws.com/35tqpmb0ya/zzz01m08-qy60n-yb4w2-ks55h-tej73h/source.mp4',
+      'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/footage/skater.hd.mp4',
     music:
       'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/unminus/lit.mp3',
     brandMark:
@@ -53,7 +53,13 @@ export const variants = [
   { name: '1x1', width: 1080, height: 1080 }
 ];
 
-/** Expand a client + variant into the merge array the render endpoint expects. */
+/**
+ * Expand a client + variant into the merge array the render endpoint expects.
+ *
+ * Every placeholder in the template is a string ("{{ WIDTH }}"), so every
+ * replace value is a string too. The engine converts "1920" back to a number
+ * where the schema needs one.
+ */
 export function mergeFieldsFor(client, variant) {
   return [
     { find: 'HEADLINE', replace: client.headline },
@@ -61,7 +67,7 @@ export function mergeFieldsFor(client, variant) {
     { find: 'BRAND_MARK', replace: client.brandMark },
     { find: 'FOOTAGE', replace: client.footage },
     { find: 'MUSIC', replace: client.music },
-    { find: 'WIDTH', replace: variant.width },
-    { find: 'HEIGHT', replace: variant.height }
+    { find: 'WIDTH', replace: String(variant.width) },
+    { find: 'HEIGHT', replace: String(variant.height) }
   ];
 }
