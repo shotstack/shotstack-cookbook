@@ -22,8 +22,9 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { lookup } from 'node:dns/promises';
 
-const PORT = Number(process.env.PORT ?? 8787);
-const ENV = process.env.SHOTSTACK_ENV ?? 'stage';
+// `||` not `??`: a variable left empty in .env arrives as '' and must fall back.
+const PORT = Number(process.env.PORT || 8787);
+const ENV = process.env.SHOTSTACK_ENV || 'stage';
 const API = `https://api.shotstack.io/edit/${ENV}`;
 const API_KEY = process.env.SHOTSTACK_API_KEY;
 
@@ -35,11 +36,18 @@ const API_KEY = process.env.SHOTSTACK_API_KEY;
  * any of them records. Fine for a demo, not for production. There you would
  * want an atomic increment in Redis or your database.
  */
-const RATE_LIMIT = Number(process.env.RATE_LIMIT ?? 10);
+const RATE_LIMIT = Number(process.env.RATE_LIMIT || 10);
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 
 /** Largest asset we'll let a user point us at. */
 const MAX_ASSET_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Every outbound request gets a deadline. A hung network then fails with one
+ * line instead of leaving the browser waiting on the proxy forever.
+ */
+const API_TIMEOUT_MS = 30_000;
+const HEAD_TIMEOUT_MS = 10_000;
 
 if (!API_KEY) {
   console.error(
@@ -53,6 +61,17 @@ if (!['stage', 'v1'].includes(ENV)) {
   process.exit(1);
 }
 
+if (
+  !Number.isInteger(PORT) ||
+  !Number.isInteger(RATE_LIMIT) ||
+  RATE_LIMIT < 1
+) {
+  console.error(
+    'PORT and RATE_LIMIT must be whole numbers. Leave them empty for the defaults.'
+  );
+  process.exit(1);
+}
+
 const headers = {
   'Content-Type': 'application/json',
   'x-api-key': API_KEY
@@ -62,7 +81,7 @@ const headers = {
 const renders = []; // { renderId, userId, status, url, createdAt }
 const rateLog = new Map(); // userId -> timestamps
 
-let templateId = process.env.SHOTSTACK_TEMPLATE_ID ?? null;
+let templateId = process.env.SHOTSTACK_TEMPLATE_ID || null;
 
 const json = (res, code, body) => {
   res.writeHead(code, { 'Content-Type': 'application/json' });
@@ -84,6 +103,21 @@ const readBody = req =>
     req.on('end', () => resolve(body));
     req.on('error', reject);
   });
+
+/** Shotstack API call with a deadline. */
+function api(path, init = {}) {
+  return fetch(`${API}${path}`, {
+    ...init,
+    headers,
+    signal: AbortSignal.timeout(API_TIMEOUT_MS)
+  }).catch(err => {
+    throw new Error(
+      err.name === 'TimeoutError'
+        ? `Shotstack API did not respond within ${API_TIMEOUT_MS / 1000}s. Check your connection and try again.`
+        : `Could not reach the Shotstack API: ${err.message}`
+    );
+  });
+}
 
 /** Reduce an API error response to one line the user can act on. */
 async function apiError(res) {
@@ -113,9 +147,8 @@ async function ensureTemplate() {
     await readFile(new URL('./template.json', import.meta.url), 'utf8')
   );
 
-  const res = await fetch(`${API}/templates`, {
+  const res = await api('/templates', {
     method: 'POST',
-    headers,
     body: JSON.stringify(template)
   });
 
@@ -151,6 +184,10 @@ function withinRateLimit(userId) {
 // Both render paths go through this: the merge values from the form, and every
 // asset src inside a submitted edit. The endpoint is plain HTTP, so treat
 // everything that arrives on it as user-supplied, whichever tab sent it.
+//
+// Redirects are refused. Following one would let a public host answer with a
+// 302 to a private address after the DNS check passed. If you must accept
+// redirects, resolve and re-check the final URL's host before following it.
 //
 // One known gap: the DNS record can change between the lookup check and the
 // HEAD request. Production code should pin the resolved address for the
@@ -196,11 +233,25 @@ async function validateAssetUrl(raw) {
 
   let head;
   try {
-    head = await fetch(url, { method: 'HEAD', redirect: 'follow' });
-  } catch {
-    return { ok: false, reason: 'unreachable' };
+    head = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(HEAD_TIMEOUT_MS)
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      reason:
+        err.name === 'TimeoutError' ? 'did not respond in time' : 'unreachable'
+    };
   }
 
+  if (head.status >= 300 && head.status < 400) {
+    return {
+      ok: false,
+      reason: 'redirects are not allowed; use the final URL'
+    };
+  }
   if (!head.ok) return { ok: false, reason: `responded ${head.status}` };
 
   // A missing content-length (chunked responses) means we can't size the asset
@@ -243,9 +294,8 @@ async function submitRender(payload) {
   if (payload.edit) {
     await validateUrls(collectUrls(payload.edit));
 
-    const res = await fetch(`${API}/render`, {
+    const res = await api('/render', {
       method: 'POST',
-      headers,
       body: JSON.stringify(payload.edit)
     });
     if (!res.ok) throw new Error(await apiError(res));
@@ -255,9 +305,8 @@ async function submitRender(payload) {
   await validateUrls(collectUrls(payload.merge ?? []));
   const id = await ensureTemplate();
 
-  const res = await fetch(`${API}/templates/render`, {
+  const res = await api('/templates/render', {
     method: 'POST',
-    headers,
     body: JSON.stringify({ id, merge: payload.merge })
   });
   if (!res.ok) throw new Error(await apiError(res));
@@ -314,7 +363,12 @@ async function handle(req, res) {
     const row = renders.find(r => r.renderId === id && r.userId === userId);
     if (!row) return json(res, 404, { error: 'not found' });
 
-    const r = await fetch(`${API}/render/${id}`, { headers });
+    let r;
+    try {
+      r = await api(`/render/${id}`);
+    } catch (err) {
+      return json(res, 502, { error: err.message });
+    }
     if (!r.ok) return json(res, 502, { error: await apiError(r) });
 
     const { response } = await r.json();
@@ -350,7 +404,7 @@ async function handle(req, res) {
     // POST it. Treat it only as a signal to re-fetch the render from the API
     // with our key, so a forged payload can't write an attacker's url onto a
     // user's render.
-    const verified = await fetch(`${API}/render/${payload.id}`, { headers })
+    const verified = await api(`/render/${payload.id}`)
       .then(r => (r.ok ? r.json() : null))
       .catch(() => null);
     if (!verified) return;

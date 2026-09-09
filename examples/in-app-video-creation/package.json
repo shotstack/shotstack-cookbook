@@ -13,7 +13,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@shotstack/shotstack-studio": "^2.15.1"
+    "@shotstack/shotstack-studio": "2.18.0"
   },
   "devDependencies": {
     "vite": "^5.4.0"
