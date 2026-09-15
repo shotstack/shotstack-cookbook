@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>In-app video creation: three paths</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        font:
+          15px/1.5 system-ui,
+          -apple-system,
+          sans-serif;
+        background: #14161a;
+        color: #e8eaed;
+      }
+      header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #2a2e35;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        font-weight: 600;
+      }
+      .sub {
+        color: #9aa0a6;
+        font-size: 13px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        padding: 16px 24px 0;
+      }
+      .tab {
+        padding: 8px 16px;
+        border: 1px solid #2a2e35;
+        background: none;
+        color: #9aa0a6;
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+      }
+      .tab[aria-selected='true'] {
+        background: #2a2e35;
+        color: #e8eaed;
+      }
+      .panel {
+        padding: 20px 24px;
+      }
+      .panel[hidden] {
+        display: none;
+      }
+      [data-shotstack-studio] {
+        width: 100%;
+        height: 400px;
+        background: #0d0f12;
+        border-radius: 8px;
+      }
+      [data-shotstack-timeline] {
+        width: 100%;
+        height: 170px;
+        overflow: hidden;
+        margin-top: 12px;
+      }
+      form {
+        max-width: 420px;
+        display: grid;
+        gap: 14px;
+      }
+      label {
+        display: grid;
+        gap: 5px;
+        font-size: 13px;
+        color: #9aa0a6;
+      }
+      input,
+      select {
+        padding: 9px 11px;
+        border: 1px solid #2a2e35;
+        border-radius: 6px;
+        background: #0d0f12;
+        color: #e8eaed;
+        font: inherit;
+      }
+      button.primary {
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 6px;
+        background: #4c8bf5;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.primary:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      button.secondary {
+        padding: 10px 18px;
+        border: 1px solid #2a2e35;
+        border-radius: 6px;
+        background: none;
+        color: #9aa0a6;
+        font: inherit;
+        cursor: pointer;
+        margin-left: 8px;
+      }
+      .hint {
+        font-size: 12px;
+        color: #6b7076;
+      }
+      .status {
+        margin-top: 14px;
+        font-size: 13px;
+        color: #9aa0a6;
+        min-height: 20px;
+      }
+      .gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .gallery video {
+        width: 260px;
+        border-radius: 6px;
+        background: #000;
+      }
+      p.lead {
+        max-width: 60ch;
+        color: #9aa0a6;
+        font-size: 13px;
+        margin-top: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <h1>Make a promo video</h1>
+      <div class="sub">One template, three ways to drive it.</div>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-panel="editor">
+        Editor
+      </button>
+      <button class="tab" role="tab" aria-selected="false" data-panel="form">
+        Quick form
+      </button>
+      <button
+        class="tab"
+        role="tab"
+        aria-selected="false"
+        data-panel="headless"
+      >
+        One click
+      </button>
+    </div>
+
+    <!-- Option 1: embedded white-label editor -->
+    <section class="panel" id="panel-editor">
+      <div data-shotstack-studio></div>
+      <div data-shotstack-timeline></div>
+      <p class="status" id="editor-status"></p>
+      <button class="primary" id="render-from-editor">Render this edit</button>
+      <button class="secondary" id="reset-draft">Start over</button>
+    </section>
+
+    <!-- Option 3: form-to-video, no editor -->
+    <section class="panel" id="panel-form" hidden>
+      <form id="quick-form">
+        <label>
+          Main message
+          <input
+            name="headline"
+            maxlength="42"
+            required
+            value="Twelve new listings this week."
+          />
+          <span class="hint">
+            Keep it short. Longer messages wrap to a second line.
+          </span>
+        </label>
+        <label>
+          Style
+          <select name="font">
+            <option value="Montserrat">Montserrat (clean)</option>
+            <option value="Open Sans">Open Sans (friendly)</option>
+            <option value="Permanent Marker">Permanent Marker (loud)</option>
+          </select>
+          <span class="hint">Built-in fonts. Nothing to host.</span>
+        </label>
+        <label>
+          Background footage
+          <select name="footage">
+            <option
+              value="https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/footage/city-timelapse.mp4"
+            >
+              City
+            </option>
+            <option
+              value="https://shotstack-assets.s3.amazonaws.com/footage/beach-overhead.mp4"
+            >
+              Beach
+            </option>
+            <option
+              value="https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/footage/skater.hd.mp4"
+            >
+              Skate
+            </option>
+          </select>
+        </label>
+        <button class="primary" type="submit">Generate video</button>
+      </form>
+      <p class="status" id="form-status"></p>
+    </section>
+
+    <!-- Option 2: headless, no editor and no form -->
+    <section class="panel" id="panel-headless" hidden>
+      <p class="lead">
+        No editor and no form. The app already knows enough to build the video,
+        so it assembles the Edit JSON itself and renders it. This is the shape
+        you want when video is an output of your product rather than its
+        purpose.
+      </p>
+      <button class="primary" id="render-headless">
+        Generate this week's listing video
+      </button>
+      <p class="status" id="headless-status"></p>
+    </section>
+
+    <section class="panel">
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
