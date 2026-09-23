@@ -1,14 +1,10 @@
 {
   "name": "scheduled-video-automation",
   "private": true,
-  "description": "Render one video per new feed item on a cron schedule with the Shotstack API",
   "engines": {
     "node": ">=20.6"
   },
   "scripts": {
-    "start": "node --env-file=.env videos.mjs",
-    "check": "node --env-file=.env videos.mjs --check --now",
-    "webhook": "node --env-file=.env webhook.mjs",
     "format": "prettier --write ."
   }
 }

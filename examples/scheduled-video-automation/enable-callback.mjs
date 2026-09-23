@@ -13,34 +13,30 @@ if (!/^[a-f0-9]{64}$/i.test(secret)) {
   process.exit(1);
 }
 const callbackUrl = process.env.CALLBACK_URL || '';
-if (!URL.canParse(callbackUrl) || new URL(callbackUrl).protocol !== 'https:') {
+const callback = URL.canParse(callbackUrl) && new URL(callbackUrl);
+if (callback?.protocol !== 'https:') {
   console.error('Set CALLBACK_URL in .env to a public HTTPS URL');
   process.exit(1);
 }
-const callback = new URL(callbackUrl);
 callback.searchParams.set('token', secret);
 const template = JSON.parse(readFileSync('template.json', 'utf8'));
 template.callback = callback.href;
 
-let response;
-try {
-  response = await fetch(
-    `https://api.shotstack.io/edit/v1/templates/${templateId}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key },
-      body: JSON.stringify({ name: 'Scheduled product video', template }),
-      signal: AbortSignal.timeout(30_000)
-    }
-  );
-} catch {
+const response = await fetch(
+  `https://api.shotstack.io/edit/v1/templates/${templateId}`,
+  {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+    body: JSON.stringify({ name: 'Scheduled product video', template }),
+    signal: AbortSignal.timeout(30_000)
+  }
+).catch(() => {
   console.error(
     'Network error: could not reach api.shotstack.io. Check the connection and try again'
   );
   process.exit(1);
-}
+});
 if (!response.ok) {
-  await response.body?.cancel();
   console.error(
     [401, 403].includes(response.status)
       ? 'The API rejected the key. Check SHOTSTACK_API_KEY in .env'
