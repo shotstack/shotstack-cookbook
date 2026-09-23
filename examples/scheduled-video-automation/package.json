@@ -1,0 +1,10 @@
+{
+  "name": "scheduled-video-automation",
+  "private": true,
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "format": "prettier --write ."
+  }
+}

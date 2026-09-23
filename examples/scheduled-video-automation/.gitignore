@@ -1,0 +1,6 @@
+.env
+state.json
+state.json.tmp
+inbox/
+.run.lock
+worker.log

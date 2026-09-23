@@ -1,0 +1,79 @@
+{
+  "timeline": {
+    "background": "#f6f3ee",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{TITLE}}",
+              "font": {
+                "family": "Roboto",
+                "size": 44,
+                "weight": "500",
+                "color": "#1c1c1c"
+              },
+              "align": { "horizontal": "center", "vertical": "middle" }
+            },
+            "start": 0,
+            "length": 5,
+            "width": 1100,
+            "height": 100,
+            "position": "bottom",
+            "offset": { "x": 0, "y": 0.04 }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": { "type": "image", "src": "{{IMAGE_1}}" },
+            "start": 0,
+            "length": 1.25,
+            "fit": "contain",
+            "scale": 0.8,
+            "position": "center",
+            "offset": { "x": 0, "y": 0.06 },
+            "effect": "zoomInSlow",
+            "transition": { "out": "fade" }
+          },
+          {
+            "asset": { "type": "image", "src": "{{IMAGE_2}}" },
+            "start": 1.25,
+            "length": 1.25,
+            "fit": "contain",
+            "scale": 0.8,
+            "position": "center",
+            "offset": { "x": 0, "y": 0.06 },
+            "effect": "zoomInSlow",
+            "transition": { "in": "fade", "out": "fade" }
+          },
+          {
+            "asset": { "type": "image", "src": "{{IMAGE_3}}" },
+            "start": 2.5,
+            "length": 1.25,
+            "fit": "contain",
+            "scale": 0.8,
+            "position": "center",
+            "offset": { "x": 0, "y": 0.06 },
+            "effect": "zoomInSlow",
+            "transition": { "in": "fade", "out": "fade" }
+          },
+          {
+            "asset": { "type": "image", "src": "{{IMAGE_4}}" },
+            "start": 3.75,
+            "length": 1.25,
+            "fit": "contain",
+            "scale": 0.8,
+            "position": "center",
+            "offset": { "x": 0, "y": 0.06 },
+            "effect": "zoomInSlow",
+            "transition": { "in": "fade" }
+          }
+        ]
+      }
+    ]
+  },
+  "output": { "format": "mp4", "resolution": "hd", "aspectRatio": "16:9" }
+}
