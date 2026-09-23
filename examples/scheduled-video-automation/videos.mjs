@@ -31,7 +31,6 @@ async function api(service, path, method = 'GET', body) {
   }
   if (!response.ok) {
     await response.body?.cancel();
-    if (response.status === 429) await sleep(60_000);
     const message = [401, 403].includes(response.status)
       ? 'The API rejected the key. Check SHOTSTACK_API_KEY in .env'
       : `${service}${path}: HTTP ${response.status}`;
@@ -74,11 +73,14 @@ async function readFeed() {
       item.images.length < 1 ||
       item.images.length > 4 ||
       !item.images.every(
-        url => typeof url === 'string' && new URL(url).protocol === 'https:'
+        url =>
+          typeof url === 'string' &&
+          URL.canParse(url) &&
+          new URL(url).protocol === 'https:'
       )
     ) {
       throw new Error(
-        'Each item needs a unique ID, a short title, and one to four HTTPS image URLs'
+        `Item ${item?.id ?? '?'}: needs a unique ID, a short title, and one to four HTTPS image URLs`
       );
     }
     ids.add(item.id);
@@ -128,9 +130,7 @@ async function getResult(renderId) {
         asset?.renderId === renderId && /\.mp4$/i.test(asset.filename || '')
     );
   if (video?.status === 'failed' || video?.status === 'deleted')
-    throw new Error(
-      `Hosting status is ${video.status}; investigate this render before doing anything else`
-    );
+    return { status: 'failed', error: `Hosting status is ${video.status}` };
   if (video?.status !== 'ready' || !video.url?.startsWith('https://')) {
     return { status: 'pending' };
   }
@@ -190,7 +190,12 @@ async function submitNew(item, state) {
     entry.status = 'pending';
     entry.checkedAt = Date.now();
   } catch (error) {
-    entry.status = [400, 401, 403, 404, 422, 429].includes(error.status)
+    if ([401, 403].includes(error.status)) {
+      delete state[item.id];
+      saveState(state);
+      throw error;
+    }
+    entry.status = [400, 404, 422].includes(error.status)
       ? 'rejected'
       : 'unknown';
     entry.error = error.message;
@@ -213,16 +218,17 @@ async function checkPending(state, force = false) {
     if (!force && !existsSync(marker) && !overdue) continue;
     if (checked === 5) break;
     checked++;
-    rmSync(marker, { force: true });
 
     try {
       const result = await getResult(entry.renderId);
+      rmSync(marker, { force: true });
       Object.assign(entry, result);
       if (result.status === 'done') {
         delete entry.error;
         console.log(`item=${id} ready ${entry.url}`);
       }
     } catch (error) {
+      if ([401, 403].includes(error.status)) throw error;
       entry.error = error.message;
       console.error(`item=${id} check deferred: ${error.message}`);
     }
@@ -249,10 +255,10 @@ async function main() {
     if (
       !item ||
       !previous ||
-      !['rejected', 'failed'].includes(previous.status)
+      !['rejected', 'failed', 'unknown'].includes(previous.status)
     ) {
       throw new Error(
-        'Retry requires a corrected feed item and a rejected or failed state entry'
+        'Retry requires a corrected feed item and a rejected, failed or unknown state entry'
       );
     }
     console.log(
@@ -268,7 +274,14 @@ async function main() {
       continue;
     }
     if (submitted === 3 || pendingEntries(state).length >= 10) break;
-    await submitNew(item, state);
+    try {
+      await submitNew(item, state);
+    } catch (error) {
+      if ([401, 403].includes(error.status)) throw error;
+      console.error(error.message);
+      process.exitCode = 1;
+      continue;
+    }
     submitted++;
   }
 

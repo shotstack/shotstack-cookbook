@@ -52,10 +52,10 @@ Other commands:
 ```bash
 node --env-file=.env videos.mjs                 # submit new items, check pending items that are due
 node --env-file=.env videos.mjs --check --now   # check all pending items, submit nothing
-./run.sh --retry sku-1002                       # resubmit a failed or rejected item after you fix its data
+./run.sh --retry sku-1002                       # resubmit a rejected, failed or unknown item after you fix its data
 ```
 
-To run on a schedule, make `run.sh` executable and add it to `crontab -e`. `run.sh` uses `flock`, so two ticks never run at the same time. Use absolute paths:
+To run on a schedule, make `run.sh` executable and add it to `crontab -e`. `run.sh` uses `flock`, so two ticks never run at the same time. Use absolute paths. The `PATH` line tells cron where to find `node`. If `command -v node` prints a directory that is not in it, add that directory:
 
 ```text
 PATH=/usr/local/bin:/usr/bin:/bin
@@ -91,4 +91,4 @@ On each run the worker checks pending renders. It checks a render when its callb
 
 `webhook.mjs` listens on `127.0.0.1:3000`. It accepts a POST to `/webhook` only with the correct `token`. It reads the render ID from the event and writes an empty marker file to `inbox/`. `enable-callback.mjs` adds the callback URL, with the token, to your saved template.
 
-If the API key is missing or rejected, each script prints one line and stops. A rejected submission is saved as `rejected` in `state.json` with the error. The next run does not resubmit it. Fix the cause and use `--retry` with the item ID.
+If the API key is missing or rejected, each script prints one line and stops, and `state.json` is not changed. An item the API refuses is saved as `rejected` with the error. The run continues with the next item and exits with code 1. An item that failed for another reason, such as a network error, is saved as `unknown`. The next run does not resubmit either. Fix the cause and use `--retry` with the item ID.
