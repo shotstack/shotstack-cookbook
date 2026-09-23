@@ -15,9 +15,6 @@ if (!key || !UUID.test(templateId)) {
   process.exit(1);
 }
 
-const NETWORK_ERROR =
-  'Network error: could not reach api.shotstack.io. Check the connection and try again';
-
 async function api(service, path, method = 'GET', body) {
   let response;
   try {
@@ -28,7 +25,9 @@ async function api(service, path, method = 'GET', body) {
       signal: AbortSignal.timeout(30_000)
     });
   } catch {
-    throw new Error(NETWORK_ERROR);
+    throw new Error(
+      'Network error: could not reach api.shotstack.io. Check the connection and try again'
+    );
   }
   if (!response.ok) {
     await response.body?.cancel();
