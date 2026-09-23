@@ -61,6 +61,14 @@ const server = createServer(async (request, response) => {
 });
 server.requestTimeout = 8000;
 server.headersTimeout = 8000;
+server.on('error', error => {
+  console.error(
+    error.code === 'EADDRINUSE'
+      ? 'Port 3000 is in use. Stop the other receiver first'
+      : error.message
+  );
+  process.exit(1);
+});
 server.listen(3000, '127.0.0.1', () =>
   console.log('Receiver listening on 127.0.0.1:3000')
 );
