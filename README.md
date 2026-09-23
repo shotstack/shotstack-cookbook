@@ -13,6 +13,7 @@ Clone this repository, or open the directory of the example you want. Each examp
 - [multi-client-video-automation](examples/multi-client-video-automation) renders branded promo videos for three clients in three aspect ratios from one master template, and records which render belongs to which client. Companion code for [A guide to automating video content production for multiple clients](https://shotstack.io/learn/automating-video-production-multiple-clients/).
 - [rapidreels](examples/rapidreels) creates faceless short-form videos using generative AI. [View demo](https://shotstack.io/demos/social-media-video-maker/).
 - [reelestate](examples/reelestate) turns static real estate images into fully edited video slideshows. [View demo](https://shotstack.io/demos/real-estate-video-listing-maker/).
+- [scheduled-video-automation](examples/scheduled-video-automation) renders one product video per new feed item on a cron schedule, keeps a history file so repeated runs skip known items, and can receive completion callbacks instead of polling. Companion code for [How to automate video creation on a schedule with the Shotstack API](https://shotstack.io/learn/automate-video-creation-on-a-schedule/).
 
 ## Contributing
 
