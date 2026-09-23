@@ -15,16 +15,21 @@ if (!key || !UUID.test(templateId)) {
   process.exit(1);
 }
 
+const NETWORK_ERROR =
+  'Network error: could not reach api.shotstack.io. Check the connection and try again';
+
 async function api(service, path, method = 'GET', body) {
-  const response = await fetch(
-    `https://api.shotstack.io/${service}/v1${path}`,
-    {
+  let response;
+  try {
+    response = await fetch(`https://api.shotstack.io/${service}/v1${path}`, {
       method,
       headers: { 'x-api-key': key, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(30_000)
-    }
-  );
+    });
+  } catch {
+    throw new Error(NETWORK_ERROR);
+  }
   if (!response.ok) {
     await response.body?.cancel();
     if (response.status === 429) await sleep(60_000);
@@ -39,9 +44,16 @@ async function api(service, path, method = 'GET', body) {
 async function readFeed() {
   let items;
   if (process.env.FEED_URL) {
-    const response = await fetch(process.env.FEED_URL, {
-      signal: AbortSignal.timeout(30_000)
-    });
+    let response;
+    try {
+      response = await fetch(process.env.FEED_URL, {
+        signal: AbortSignal.timeout(30_000)
+      });
+    } catch {
+      throw new Error(
+        'Network error: could not fetch FEED_URL. Check the URL and the connection'
+      );
+    }
     if (!response.ok) throw new Error(`Feed: HTTP ${response.status}`);
     items = await response.json();
   } else {
@@ -127,7 +139,14 @@ async function getResult(renderId) {
 }
 
 function readState() {
-  const state = JSON.parse(readFileSync('state.json', 'utf8'));
+  let state;
+  try {
+    state = JSON.parse(readFileSync('state.json', 'utf8'));
+  } catch {
+    throw new Error(
+      'state.json is missing or not valid JSON. Create it with {} or restore your history'
+    );
+  }
   if (!state || typeof state !== 'object' || Array.isArray(state)) {
     throw new Error('Invalid state.json; restore your history');
   }
