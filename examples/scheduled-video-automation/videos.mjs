@@ -15,6 +15,11 @@ if (!key || !UUID.test(templateId)) {
   process.exit(1);
 }
 
+// 401/403 = wrong key, 404 on the template = wrong SHOTSTACK_TEMPLATE_ID.
+// Both are configuration errors, so the run stops and state.json is not touched.
+const isConfigError = error =>
+  [401, 403].includes(error.status) || error.status === 404;
+
 async function api(service, path, method = 'GET', body) {
   let response;
   try {
@@ -30,13 +35,43 @@ async function api(service, path, method = 'GET', body) {
     );
   }
   if (!response.ok) {
-    await response.body?.cancel();
+    let detail = '';
+    try {
+      const body = await response.json();
+      detail =
+        body.errors?.[0]?.detail || body.response?.error || body.message || '';
+    } catch {
+      // No JSON body; the status code is all we have.
+    }
     const message = [401, 403].includes(response.status)
       ? 'The API rejected the key. Check SHOTSTACK_API_KEY in .env'
-      : `${service}${path}: HTTP ${response.status}`;
+      : response.status === 404 && path.startsWith('/templates')
+        ? 'Template not found. Check SHOTSTACK_TEMPLATE_ID in .env'
+        : `${service}${path}: HTTP ${response.status}${detail ? ` ${detail}` : ''}`;
     throw Object.assign(new Error(message), { status: response.status });
   }
   return response.json();
+}
+
+function validItem(item, ids) {
+  return (
+    item &&
+    typeof item.id === 'string' &&
+    /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(item.id) &&
+    !ids.has(item.id) &&
+    typeof item.title === 'string' &&
+    item.title.trim() &&
+    item.title.length <= 80 &&
+    Array.isArray(item.images) &&
+    item.images.length >= 1 &&
+    item.images.length <= 4 &&
+    item.images.every(
+      url =>
+        typeof url === 'string' &&
+        URL.canParse(url) &&
+        new URL(url).protocol === 'https:'
+    )
+  );
 }
 
 async function readFeed() {
@@ -59,33 +94,21 @@ async function readFeed() {
   }
   if (!Array.isArray(items) || items.length > 1000)
     throw new Error('Expected a small array of feed items');
+  // An invalid item is reported and skipped, so one bad record does not stop the others.
   const ids = new Set();
+  const valid = [];
   for (const item of items) {
-    if (
-      !item ||
-      typeof item.id !== 'string' ||
-      !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(item.id) ||
-      ids.has(item.id) ||
-      typeof item.title !== 'string' ||
-      !item.title.trim() ||
-      item.title.length > 80 ||
-      !Array.isArray(item.images) ||
-      item.images.length < 1 ||
-      item.images.length > 4 ||
-      !item.images.every(
-        url =>
-          typeof url === 'string' &&
-          URL.canParse(url) &&
-          new URL(url).protocol === 'https:'
-      )
-    ) {
-      throw new Error(
+    if (validItem(item, ids)) {
+      ids.add(item.id);
+      valid.push(item);
+    } else {
+      console.error(
         `Item ${item?.id ?? '?'}: needs a unique ID, a short title, and one to four HTTPS image URLs`
       );
+      process.exitCode = 1;
     }
-    ids.add(item.id);
   }
-  return items;
+  return valid;
 }
 
 async function submit(item) {
@@ -107,7 +130,14 @@ async function submit(item) {
 }
 
 async function getResult(renderId) {
-  const { response } = await api('edit', `/render/${renderId}?data=false`);
+  let response;
+  try {
+    ({ response } = await api('edit', `/render/${renderId}?data=false`));
+  } catch (error) {
+    if ([400, 404].includes(error.status))
+      return { status: 'failed', error: 'Render not found' };
+    throw error;
+  }
   if (response?.id !== renderId || !response.status)
     throw new Error('Unexpected render response');
   console.log(`render=${renderId} status=${response.status}`);
@@ -190,14 +220,12 @@ async function submitNew(item, state) {
     entry.status = 'pending';
     entry.checkedAt = Date.now();
   } catch (error) {
-    if ([401, 403].includes(error.status)) {
+    if (isConfigError(error)) {
       delete state[item.id];
       saveState(state);
       throw error;
     }
-    entry.status = [400, 404, 422].includes(error.status)
-      ? 'rejected'
-      : 'unknown';
+    entry.status = [400, 422].includes(error.status) ? 'rejected' : 'unknown';
     entry.error = error.message;
   }
   saveState(state);
@@ -209,6 +237,9 @@ async function submitNew(item, state) {
       entry.error || 'Submission stopped; inspect state.json before retrying'
     );
 }
+
+// A render that never reports a hosted file stops blocking a pending slot after a day.
+const PENDING_LIMIT = 24 * 60 * 60_000;
 
 async function checkPending(state, force = false) {
   let checked = 0;
@@ -222,13 +253,20 @@ async function checkPending(state, force = false) {
     try {
       const result = await getResult(entry.renderId);
       rmSync(marker, { force: true });
+      if (
+        result.status === 'pending' &&
+        Date.now() - Date.parse(entry.attemptedAt) > PENDING_LIMIT
+      ) {
+        result.status = 'failed';
+        result.error = 'No hosted file after 24 hours';
+      }
       Object.assign(entry, result);
       if (result.status === 'done') {
         delete entry.error;
         console.log(`item=${id} ready ${entry.url}`);
       }
     } catch (error) {
-      if ([401, 403].includes(error.status)) throw error;
+      if (isConfigError(error)) throw error;
       entry.error = error.message;
       console.error(`item=${id} check deferred: ${error.message}`);
     }
@@ -243,13 +281,15 @@ async function checkPending(state, force = false) {
 }
 
 async function main() {
+  const argv = process.argv.slice(2);
   const state = readState();
-  await checkPending(state, process.argv.includes('--now'));
-  if (process.argv.includes('--check')) return;
+  await checkPending(state, argv.includes('--now'));
+  if (argv.includes('--check')) return;
 
   const items = await readFeed();
-  if (process.argv[2] === '--retry') {
-    const id = process.argv[3];
+  const retryAt = argv.indexOf('--retry');
+  if (retryAt !== -1) {
+    const id = argv[retryAt + 1];
     const item = items.find(item => item.id === id);
     const previous = Object.hasOwn(state, id) ? state[id] : null;
     if (
@@ -265,27 +305,27 @@ async function main() {
       `item=${id} retrying; previous render=${previous.renderId || 'none'}`
     );
     await submitNew(item, state);
-    return;
-  }
-  let submitted = 0;
-  for (const item of items) {
-    if (Object.hasOwn(state, item.id)) {
-      console.log(`item=${item.id} skipped (${state[item.id].status})`);
-      continue;
+  } else {
+    // At most three attempts per run, whether or not they succeed.
+    let attempts = 0;
+    for (const item of items) {
+      if (Object.hasOwn(state, item.id)) {
+        console.log(`item=${item.id} skipped (${state[item.id].status})`);
+        continue;
+      }
+      if (attempts === 3 || pendingEntries(state).length >= 10) break;
+      attempts++;
+      try {
+        await submitNew(item, state);
+      } catch (error) {
+        if (isConfigError(error)) throw error;
+        console.error(error.message);
+        process.exitCode = 1;
+      }
     }
-    if (submitted === 3 || pendingEntries(state).length >= 10) break;
-    try {
-      await submitNew(item, state);
-    } catch (error) {
-      if ([401, 403].includes(error.status)) throw error;
-      console.error(error.message);
-      process.exitCode = 1;
-      continue;
-    }
-    submitted++;
   }
 
-  if (process.argv.includes('--wait')) {
+  if (argv.includes('--wait')) {
     const deadline = Date.now() + 5 * 60_000;
     while (pendingEntries(state).length && Date.now() < deadline) {
       await checkPending(state, true);
