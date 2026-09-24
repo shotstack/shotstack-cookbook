@@ -1,0 +1,29 @@
+[
+  {
+    "slug": "harbour-beaches-closed",
+    "headline": "Big swell closes harbour beaches for the weekend",
+    "images": [
+      "https://shotstack-assets.s3.amazonaws.com/images/wave-barrel.jpg",
+      "https://shotstack-assets.s3.amazonaws.com/images/slideshow2.jpeg"
+    ],
+    "videoUrl": "https://shotstack-api-stage-output.s3-ap-southeast-2.amazonaws.com/m0018rioc2/8e0a34d4-cb39-434f-b723-d44a50f7365a.mp4"
+  },
+  {
+    "slug": "mountain-road-reopens",
+    "headline": "Mountain road reopens six weeks after the landslide",
+    "images": [
+      "https://shotstack-assets.s3.amazonaws.com/images/slideshow7.jpeg",
+      "https://shotstack-assets.s3.amazonaws.com/images/slideshow4.jpeg"
+    ],
+    "videoUrl": "https://shotstack-api-stage-output.s3-ap-southeast-2.amazonaws.com/m0018rioc2/7bc220e2-db31-43f8-b403-d4e5995a9cf5.mp4"
+  },
+  {
+    "slug": "rates-fall-again",
+    "headline": "Home loan rates fall for the third month in a row",
+    "images": [
+      "https://shotstack-assets.s3.amazonaws.com/images/financial-background.jpg",
+      "https://shotstack-assets.s3.amazonaws.com/images/business-man.jpg"
+    ],
+    "videoUrl": "https://shotstack-api-stage-output.s3-ap-southeast-2.amazonaws.com/m0018rioc2/0f30a9ca-22b0-48dd-b928-a443ee70cdec.mp4"
+  }
+]

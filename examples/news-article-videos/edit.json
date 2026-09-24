@@ -1,0 +1,81 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "fonts": [
+      {
+        "src": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm45xW5rygbi49c.ttf"
+      }
+    ],
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{HEADLINE}}",
+              "font": {
+                "family": "JTUSjIg1_i6t8kCHKm45xW5rygbi49c",
+                "size": 72,
+                "weight": "800",
+                "color": "#ffffff"
+              },
+              "style": { "lineHeight": 1.1 },
+              "background": {
+                "color": "#0b0f1a",
+                "opacity": 0.82,
+                "borderRadius": 24
+              },
+              "padding": { "top": 36, "right": 44, "bottom": 44, "left": 44 },
+              "align": { "horizontal": "left", "vertical": "middle" },
+              "animation": {
+                "preset": "ascend",
+                "duration": 0.6,
+                "direction": "up"
+              }
+            },
+            "start": 0.5,
+            "length": 23.5,
+            "width": 960,
+            "height": 420,
+            "position": "bottom",
+            "offset": { "y": 0.08 }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": { "type": "image", "src": "{{IMAGE_1}}" },
+            "start": 0,
+            "length": 12,
+            "fit": "crop",
+            "effect": "zoomInSlow"
+          },
+          {
+            "asset": { "type": "image", "src": "{{IMAGE_2}}" },
+            "start": 12,
+            "length": 12,
+            "fit": "crop",
+            "effect": "slideUpSlow",
+            "transition": { "in": "fade" }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "https://shotstack-assets.s3.amazonaws.com/music/unminus/berlin.mp3",
+              "volume": 0.3,
+              "effect": "fadeOut"
+            },
+            "start": 0,
+            "length": "end"
+          }
+        ]
+      }
+    ]
+  },
+  "output": { "format": "mp4", "size": { "width": 1080, "height": 1920 } }
+}
