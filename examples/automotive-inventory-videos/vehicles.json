@@ -1,0 +1,56 @@
+[
+  {
+    "stockId": "STK-10482",
+    "year": 2024,
+    "make": "Mercedes-Benz",
+    "model": "A 200",
+    "trim": "Progressive hatch, Jupiter Red",
+    "price": "$47,990",
+    "odometer": "12,450 km",
+    "transmission": "Automatic",
+    "fuel": "Petrol",
+    "dealer": "Northside Motors",
+    "photos": [
+      "https://templates.shotstack.io/car-sale-slideshow-video/27efb285-a3b2-47e6-8440-574a6b660183/pexels-photo-9513395.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/e574b011-2c53-47df-acfe-e0759840a106/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/ec960f5b-85be-453e-a951-e1469da2dd6a/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/96fd90d8-c88b-482c-a539-e375314c564b/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/6726f69d-af0f-4701-b5f9-98594f9ccfad/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/a25bb50a-8813-4514-9913-3e323cd7cf8c/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/cda2590c-1033-430a-bd0f-ca28506f99c8/source.jpg"
+    ]
+  },
+  {
+    "stockId": "STK-10517",
+    "year": 2023,
+    "make": "Mercedes-Benz",
+    "model": "A 250",
+    "trim": "AMG Line hatch, Jupiter Red",
+    "price": "$52,500",
+    "odometer": "28,900 km",
+    "transmission": "Automatic",
+    "fuel": "Petrol",
+    "dealer": "Northside Motors",
+    "photos": [
+      "https://templates.shotstack.io/car-sale-slideshow-video/ec960f5b-85be-453e-a951-e1469da2dd6a/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/96fd90d8-c88b-482c-a539-e375314c564b/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/a25bb50a-8813-4514-9913-3e323cd7cf8c/source.jpg",
+      "https://templates.shotstack.io/car-sale-slideshow-video/6726f69d-af0f-4701-b5f9-98594f9ccfad/source.jpg"
+    ]
+  },
+  {
+    "stockId": "STK-10533",
+    "year": 2022,
+    "make": "Tesla",
+    "model": "Model 3",
+    "trim": "Standard Range Plus, Pearl White",
+    "price": "$58,900",
+    "odometer": "41,200 km",
+    "transmission": "Automatic",
+    "fuel": "Electric",
+    "dealer": "Northside Motors",
+    "photos": [
+      "https://templates.shotstack.io/electric-car-for-sale/a7bc8cd1-1cf6-4020-841f-5b47b0d0f3b8/source.jpg"
+    ]
+  }
+]

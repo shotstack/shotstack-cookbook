@@ -6,6 +6,7 @@ Clone this repository, or open the directory of the example you want. Each examp
 
 ## Examples
 
+- [automotive-inventory-videos](examples/automotive-inventory-videos) renders one vertical video per vehicle in a dealer inventory from a JSON feed: the photos in sequence with a pan or zoom on each, and an animated specification card. The Edit JSON is built in code, one clip per photo.
 - [bulk-csv-videos](examples/bulk-csv-videos) renders one video per row of a CSV from a single template with merge fields, tracked in a resumable manifest, with an optional AI step where Claude writes each row's headline and image prompt. Companion code for [Generate videos in bulk with an API and an AI agent](https://shotstack.io/learn/bulk-create-videos-from-csv-and-ai/).
 - [first-render](examples/first-render) the very basics: submit an Edit, poll the render status, and print the output URL, in Node.js and Python. Start here if you are new to the API. Companion code for [Render your first video with the Shotstack API](https://shotstack.io/learn/render-your-first-video-shotstack-api/).
 - [in-app-video-creation](examples/in-app-video-creation) lets a user create the same promo video three ways: an embedded Studio SDK editor, a quick form, and a one-click headless render, all through one render proxy that keeps the API key server-side. Companion code for [Add video creation to your app without building an editor](https://shotstack.io/learn/add-video-creation-to-your-app/).
