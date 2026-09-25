@@ -66,9 +66,10 @@ URL. The sample source video is a 99 minute match of about 700 MB. Shotstack dow
 file before it renders, so this render takes longer than a render of a short clip.
 
 The sample match is the recording that the related guide uses. Each goal starts about 3 seconds
-before the build-up, so the clip shows the attack, the goal and the celebration. To render your own
-match, replace the source URL with a public HTTPS URL. Then list the goals. For each goal, set `at`
-to the second in the recording where its highlight starts. To change the clip length, edit
+before the build-up, so the clip shows the attack, the goal and the celebration. Shotstack does not find the moments to cut. The times come from your own data, such as event
+tags from your scoring system or the output of a detection model. To render your own match,
+replace the source URL with a public HTTPS URL. Then list the goals. For each goal, set `at` to the
+second in the recording where its highlight starts. To change the clip length, edit
 `edit.mjs`.
 
 `renders.jsonl` only appends. Delete the file to start a new batch.
