@@ -13,6 +13,7 @@ Clone this repository, or open the directory of the example you want. Each examp
 - [multi-client-video-automation](examples/multi-client-video-automation) renders branded promo videos for three clients in three aspect ratios from one master template, and records which render belongs to which client. Companion code for [A guide to automating video content production for multiple clients](https://shotstack.io/learn/automating-video-production-multiple-clients/).
 - [rapidreels](examples/rapidreels) creates faceless short-form videos using generative AI. [View demo](https://shotstack.io/demos/social-media-video-maker/).
 - [reelestate](examples/reelestate) turns static real estate images into fully edited video slideshows. [View demo](https://shotstack.io/demos/real-estate-video-listing-maker/).
+- [sports-highlight-videos](examples/sports-highlight-videos) trims a 10 second clip at each goal of a full match recording and joins them in one vertical render, cropped from the landscape footage. Extends [Automate sports video highlights using an API](https://shotstack.io/learn/automated-sports-highlight-video-api/).
 
 ## Contributing
 
