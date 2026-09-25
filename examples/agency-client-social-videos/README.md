@@ -55,7 +55,7 @@ Run `status.mjs` again until each render shows `done`.
 `render.mjs` reads `clients.json` and checks each client. A client needs a slug, a name, a hex
 brand color, an SVG brand mark and at least one media item. Each media item needs a type, image or
 video, and an HTTPS URL. The script reports every problem it finds, then stops. For each client it
-builds an Edit JSON and submits one render. The media plays in sequence, 3.5 seconds each,
+builds an Edit JSON and submits one render. The media plays in sequence, 4 seconds each,
 cropped to fill the vertical frame. Images get a slow zoom. Video clips play without their own
 sound. The video ends on a two second card in the brand color with the brand mark. A music track
 plays under the whole video. The script appends one line per render to `renders.jsonl` and ends

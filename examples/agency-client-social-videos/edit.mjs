@@ -1,6 +1,6 @@
 const MUSIC_URL =
   'https://shotstack-assets.s3.amazonaws.com/music/unminus/happy.mp3';
-const SECONDS_PER_ITEM = 3.5;
+const SECONDS_PER_ITEM = 4;
 const END_CARD_SECONDS = 2;
 const WIDTH = 1080;
 const HEIGHT = 1920;
