@@ -3,7 +3,8 @@
 Turn a full match recording and a list of goals into one vertical highlight video. The match
 record has a source video URL and one entry per goal, with the second in the recording where its
 highlight starts. The script trims a 10 second clip at each goal and joins the clips in one render.
-It crops the landscape footage to fill a vertical frame and adds music under the match sound. You
+It shows the full landscape frame in the middle of a vertical video, over a
+blurred copy of the same clip. Music plays under the match sound. You
 get one 1080 x 1920 MP4 per match.
 
 Related guide: [Automate sports video highlights using an API](https://shotstack.io/learn/automated-sports-highlight-video-api/).
@@ -57,8 +58,9 @@ Run `status.mjs` again until the render shows `done`.
 `render.mjs` reads `match.json` and checks that it has a match id, an HTTPS source URL and at least
 one goal with a time in seconds. It reports every problem it finds, then stops. It builds one Edit
 JSON with one clip per goal, 10 seconds each, trimmed from the same source video with the `trim`
-property. Each clip starts when the previous one ends. The script crops each clip from the center of
-the frame to fill 1080 x 1920. The match sound plays at a lower volume, with a music track under it.
+property. Each clip starts when the previous one ends. The full frame sits in the middle of the 1080 x 1920 video. A
+blurred, darker copy of the same clip fills the space above and below, so the footage is not
+cropped or enlarged. The match sound plays at a lower volume, with a music track under it.
 The script appends one line to `renders.jsonl`.
 
 `status.mjs` reads `renders.jsonl` and checks the render once. A `done` render prints its video
