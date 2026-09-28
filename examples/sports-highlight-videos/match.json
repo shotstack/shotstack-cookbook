@@ -1,0 +1,15 @@
+{
+  "matchId": "ottoville-v-ottawa-hills",
+  "source": "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/soccer-game.mp4",
+  "goals": [
+    {
+      "at": 3468
+    },
+    {
+      "at": 4278
+    },
+    {
+      "at": 4598
+    }
+  ]
+}

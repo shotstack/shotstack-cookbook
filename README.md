@@ -6,14 +6,17 @@ Clone this repository, or open the directory of the example you want. Each examp
 
 ## Examples
 
+- [agency-client-social-videos](examples/agency-client-social-videos) renders one short vertical video per agency client from that client's own photos and video clips, ending on a card in the client's brand color. The Edit JSON is built in code, one clip per media item.
 - [automotive-inventory-videos](examples/automotive-inventory-videos) renders one vertical video per vehicle in a dealer inventory from a JSON feed: the photos in sequence with a pan or zoom on each, and an animated specification card. The Edit JSON is built in code, one clip per photo.
 - [bulk-csv-videos](examples/bulk-csv-videos) renders one video per row of a CSV from a single template with merge fields, tracked in a resumable manifest, with an optional AI step where Claude writes each row's headline and image prompt. Companion code for [Generate videos in bulk with an API and an AI agent](https://shotstack.io/learn/bulk-create-videos-from-csv-and-ai/).
+- [elevenlabs-voiceover-video](examples/elevenlabs-voiceover-video) narrates a video in an ElevenLabs voice, cloned from your own sample if you want, uploads the audio through the Ingest API and renders a captioned video.
 - [first-render](examples/first-render) the very basics: submit an Edit, poll the render status, and print the output URL, in Node.js and Python. Start here if you are new to the API. Companion code for [Render your first video with the Shotstack API](https://shotstack.io/learn/render-your-first-video-shotstack-api/).
 - [in-app-video-creation](examples/in-app-video-creation) lets a user create the same promo video three ways: an embedded Studio SDK editor, a quick form, and a one-click headless render, all through one render proxy that keeps the API key server-side. Companion code for [Add video creation to your app without building an editor](https://shotstack.io/learn/add-video-creation-to-your-app/).
 - [instagram-ai-video](examples/instagram-ai-video) generates a script, voiceover and background image with AI, renders a 1080x1920 video, and publishes it as an Instagram Reel. Companion code for [How to automate Instagram posts with AI video](https://shotstack.io/learn/automate-instagram-posts-with-ai-video/).
 - [multi-client-video-automation](examples/multi-client-video-automation) renders branded promo videos for three clients in three aspect ratios from one master template, and records which render belongs to which client. Companion code for [A guide to automating video content production for multiple clients](https://shotstack.io/learn/automating-video-production-multiple-clients/).
 - [rapidreels](examples/rapidreels) creates faceless short-form videos using generative AI. [View demo](https://shotstack.io/demos/social-media-video-maker/).
 - [reelestate](examples/reelestate) turns static real estate images into fully edited video slideshows. [View demo](https://shotstack.io/demos/real-estate-video-listing-maker/).
+- [sports-highlight-videos](examples/sports-highlight-videos) trims a 10 second clip at each goal of a full match recording and joins them in one vertical render, cropped from the landscape footage. Extends [Automate sports video highlights using an API](https://shotstack.io/learn/automated-sports-highlight-video-api/).
 
 ## Contributing
 

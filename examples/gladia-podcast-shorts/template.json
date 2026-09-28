@@ -1,0 +1,105 @@
+{
+  "timeline": {
+    "fonts": [
+      {
+        "src": "https://fonts.gstatic.com/s/inter/v20/UcCo3FwrK3iLTfvlaQc78lA2.ttf"
+      }
+    ],
+    "background": "#0E1117",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-caption",
+              "src": "{{SRT_URL}}",
+              "font": {
+                "family": "UcCo3FwrK3iLTfvlaQc78lA2",
+                "size": 46,
+                "color": "#FFFFFF",
+                "weight": "700"
+              },
+              "background": {
+                "color": "#000000",
+                "opacity": 0.6,
+                "borderRadius": 10,
+                "padding": 14
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "middle"
+              }
+            },
+            "start": 0,
+            "length": "end",
+            "fit": "none",
+            "width": 900,
+            "height": 700,
+            "position": "center"
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{SPEAKER}}",
+              "font": {
+                "family": "UcCo3FwrK3iLTfvlaQc78lA2",
+                "size": 34,
+                "color": "#0B0B0B",
+                "weight": "700"
+              },
+              "background": {
+                "color": "{{ACCENT}}",
+                "opacity": 1,
+                "borderRadius": 6,
+                "padding": 12
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "middle"
+              },
+              "animation": {
+                "preset": "fadeIn",
+                "duration": 0.6
+              }
+            },
+            "start": 0.4,
+            "length": 3,
+            "position": "top",
+            "offset": {
+              "x": 0,
+              "y": -0.08
+            },
+            "transition": {
+              "out": "fadeFast"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "{{AUDIO_URL}}",
+              "trim": 0,
+              "volume": 1
+            },
+            "start": 0,
+            "length": "end"
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "size": {
+      "width": 1080,
+      "height": 1920
+    }
+  }
+}

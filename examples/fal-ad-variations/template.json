@@ -1,0 +1,156 @@
+{
+  "timeline": {
+    "fonts": [
+      {
+        "src": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm45xW5rygbi49c.ttf"
+      }
+    ],
+    "background": "#000000",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{HEADLINE}}",
+              "font": {
+                "family": "JTUSjIg1_i6t8kCHKm45xW5rygbi49c",
+                "size": 64,
+                "color": "#FFFFFF",
+                "weight": "700"
+              },
+              "style": {
+                "lineHeight": 1.05
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "middle"
+              },
+              "shadow": {
+                "offsetX": 0,
+                "offsetY": 4,
+                "blur": 18,
+                "color": "#000000",
+                "opacity": 0.45
+              },
+              "animation": {
+                "preset": "ascend",
+                "duration": 0.6,
+                "direction": "up"
+              }
+            },
+            "start": 0.5,
+            "length": 4,
+            "position": "top",
+            "offset": {
+              "x": 0,
+              "y": -0.08
+            },
+            "transition": {
+              "out": "fadeFast"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{CTA}}",
+              "font": {
+                "family": "JTUSjIg1_i6t8kCHKm45xW5rygbi49c",
+                "size": 40,
+                "color": "#0B0B0B",
+                "weight": "700"
+              },
+              "background": {
+                "color": "{{ACCENT}}",
+                "opacity": 1,
+                "borderRadius": 12,
+                "padding": 18
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "middle"
+              },
+              "animation": {
+                "preset": "fadeIn",
+                "duration": 0.6
+              }
+            },
+            "start": 8.6,
+            "length": 3.4,
+            "position": "bottom",
+            "offset": {
+              "x": 0,
+              "y": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "image",
+              "src": "{{IMG1}}"
+            },
+            "start": 0,
+            "length": 4,
+            "effect": "zoomInSlow",
+            "transition": {
+              "in": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "image",
+              "src": "{{IMG2}}"
+            },
+            "start": 4,
+            "length": 4,
+            "effect": "slideLeftSlow",
+            "transition": {
+              "in": "fadeSlow"
+            }
+          },
+          {
+            "asset": {
+              "type": "image",
+              "src": "{{IMG3}}"
+            },
+            "start": 8,
+            "length": 4,
+            "effect": "zoomOutSlow",
+            "transition": {
+              "in": "fadeSlow",
+              "out": "fadeSlow"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "https://shotstack-assets.s3.amazonaws.com/music/unminus/lit.mp3",
+              "volume": 0.35,
+              "effect": "fadeOut"
+            },
+            "start": 0,
+            "length": "end"
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "size": {
+      "width": 1080,
+      "height": 1920
+    }
+  }
+}
