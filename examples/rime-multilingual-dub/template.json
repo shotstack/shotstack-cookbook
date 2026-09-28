@@ -1,0 +1,116 @@
+{
+  "timeline": {
+    "fonts": [
+      {
+        "src": "https://fonts.gstatic.com/s/inter/v20/UcCo3FwrK3iLTfvlaQc78lA2.ttf"
+      }
+    ],
+    "background": "#000000",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-caption",
+              "src": "alias://dub",
+              "font": {
+                "family": "UcCo3FwrK3iLTfvlaQc78lA2",
+                "size": 40,
+                "color": "#FFFFFF",
+                "weight": "700"
+              },
+              "background": {
+                "color": "#000000",
+                "opacity": 0.55,
+                "borderRadius": 8,
+                "padding": 12
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "bottom"
+              }
+            },
+            "start": 0,
+            "length": "alias://dub",
+            "fit": "none",
+            "width": 1000,
+            "height": 320,
+            "position": "bottom",
+            "offset": {
+              "x": 0,
+              "y": 0.08
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{LOCALE_LABEL}}",
+              "font": {
+                "family": "UcCo3FwrK3iLTfvlaQc78lA2",
+                "size": 28,
+                "color": "#0B0B0B",
+                "weight": "700"
+              },
+              "background": {
+                "color": "{{ACCENT}}",
+                "opacity": 1,
+                "borderRadius": 4,
+                "padding": 10
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "middle"
+              }
+            },
+            "start": 0.5,
+            "length": 3,
+            "position": "topRight",
+            "offset": {
+              "x": -0.04,
+              "y": -0.05
+            },
+            "transition": {
+              "in": "fade",
+              "out": "fadeFast"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "{{DUB_URL}}"
+            },
+            "alias": "dub",
+            "start": 0,
+            "length": "alias://source"
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "video",
+              "src": "{{SOURCE_VIDEO}}",
+              "volume": 0
+            },
+            "alias": "source",
+            "start": 0,
+            "length": "auto"
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "1080"
+  }
+}
