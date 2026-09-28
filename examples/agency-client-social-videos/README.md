@@ -64,7 +64,7 @@ with the count of submitted renders.
 `status.mjs` reads `renders.jsonl` and checks each render once. A `done` render prints its video
 URL.
 
-To render your own clients, replace the records in `clients.json`. Media URLs must be public HTTPS
+The sample has one client. Add a record to `clients.json` for each client you want to render. Media URLs must be public HTTPS
 URLs. To change the timing or the end card, edit `edit.mjs`.
 
 `renders.jsonl` only appends. Delete the file to start a new batch.
