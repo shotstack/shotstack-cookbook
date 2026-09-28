@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "tidewater-stays",
+    "name": "Tidewater Stays",
+    "brandColor": "#0f4c5c",
+    "brandMark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\" width=\"240\" height=\"240\"><circle cx=\"120\" cy=\"120\" r=\"100\" fill=\"#f9c74f\"/></svg>",
+    "media": [
+      {
+        "type": "video",
+        "src": "https://shotstack-assets.s3.amazonaws.com/footage/beach-overhead.mp4"
+      },
+      {
+        "type": "image",
+        "src": "https://shotstack-assets.s3.amazonaws.com/images/slideshow1.jpeg"
+      },
+      {
+        "type": "video",
+        "src": "https://shotstack-assets.s3.amazonaws.com/footage/sunset.mp4"
+      },
+      {
+        "type": "image",
+        "src": "https://shotstack-assets.s3.amazonaws.com/images/slideshow5.jpeg"
+      }
+    ]
+  }
+]
