@@ -1,0 +1,109 @@
+{
+  "timeline": {
+    "fonts": [
+      {
+        "src": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm45xW5rygbi49c.ttf"
+      }
+    ],
+    "background": "#0B1A2E",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-caption",
+              "src": "alias://character",
+              "font": {
+                "family": "JTUSjIg1_i6t8kCHKm45xW5rygbi49c",
+                "size": 40,
+                "color": "#FFFFFF",
+                "weight": "700"
+              },
+              "background": {
+                "color": "#000000",
+                "opacity": 0.55,
+                "borderRadius": 8,
+                "padding": 12
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "bottom"
+              }
+            },
+            "start": 0,
+            "length": "alias://character",
+            "fit": "none",
+            "width": 960,
+            "height": 300,
+            "position": "bottom",
+            "offset": {
+              "x": 0,
+              "y": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://shotstack-assets.s3.amazonaws.com/images/business-man.jpg"
+            },
+            "start": 4,
+            "length": 3,
+            "effect": "zoomInSlow",
+            "fit": "crop",
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "video",
+              "src": "{{CHARACTER_URL}}"
+            },
+            "alias": "character",
+            "start": 0,
+            "length": "auto"
+          },
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{END_CARD}}",
+              "font": {
+                "family": "JTUSjIg1_i6t8kCHKm45xW5rygbi49c",
+                "size": 58,
+                "color": "#FFFFFF",
+                "weight": "700"
+              },
+              "align": {
+                "horizontal": "center",
+                "vertical": "middle"
+              },
+              "animation": {
+                "preset": "ascend",
+                "duration": 0.6,
+                "direction": "up"
+              }
+            },
+            "start": "auto",
+            "length": 3,
+            "transition": {
+              "in": "fade"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "1080"
+  }
+}
