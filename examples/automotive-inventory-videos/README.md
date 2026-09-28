@@ -54,7 +54,7 @@ Run `status.mjs` again until each render shows `done`.
 `render.mjs` reads `vehicles.json` and checks that each vehicle has every field and at least one
 photo. It reports every problem it finds, then stops. For each vehicle it builds an Edit JSON and
 submits one render. The video shows the photos in sequence, 3.2 seconds each, cropped to fill the
-vertical frame. Each photo fades in, and the pan or zoom changes from one photo to the next. A
+vertical frame. Each photo dissolves into the next, and the pan or zoom changes from one photo to the next. A
 vehicle with one or two photos gets at least six seconds. A card with the year, make, model, trim,
 price, odometer, transmission and fuel type slides in at the bottom. The dealer name is at the
 top. A music track plays under the whole video. The script appends one line per render to
@@ -64,7 +64,7 @@ top. A music track plays under the whole video. The script appends one line per 
 URL.
 
 The card and the dealer name are `html5` assets. The script writes the vehicle data into their
-HTML before the render. To render your own inventory, replace the records in `vehicles.json`.
+HTML before the render. The sample has one vehicle. Add a record to `vehicles.json` for each vehicle you want to render.
 Photo URLs must be public HTTPS URLs. To change the layout, edit `edit.mjs`.
 
 `renders.jsonl` only appends. Delete the file to start a new batch.

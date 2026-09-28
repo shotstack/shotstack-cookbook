@@ -60,17 +60,37 @@ function dealerBadge(vehicle, length) {
   };
 }
 
-// One clip per photo on a single track. "auto" starts each clip when the
-// previous one ends, so the video is as long as the vehicle has photos.
+// One clip per photo, alternating between two tracks so each photo
+// dissolves into the next instead of dipping to black. An odd photo sits on
+// the upper track: it fades in over the photo below, then fades out to reveal
+// the next photo, which already plays underneath. OVERLAP matches the length
+// of the fade transition.
+const OVERLAP = 1;
+
 function photoClips(photos, secondsPerPhoto) {
-  return photos.map((src, index) => ({
-    asset: { type: 'image', src },
-    start: index === 0 ? 0 : 'auto',
-    length: secondsPerPhoto,
-    fit: 'crop',
-    effect: EFFECTS[index % EFFECTS.length],
-    transition: { in: 'fade' }
-  }));
+  const upper = [];
+  const lower = [];
+
+  photos.forEach((src, index) => {
+    const isLast = index === photos.length - 1;
+    const clip = {
+      asset: { type: 'image', src },
+      start: index * secondsPerPhoto,
+      length: secondsPerPhoto + (isLast ? 0 : OVERLAP),
+      fit: 'crop',
+      effect: EFFECTS[index % EFFECTS.length]
+    };
+
+    if (index % 2 === 1) {
+      clip.transition = isLast ? { in: 'fade' } : { in: 'fade', out: 'fade' };
+      upper.push(clip);
+    } else {
+      if (index === 0) clip.transition = { in: 'fade' };
+      lower.push(clip);
+    }
+  });
+
+  return { upper, lower };
 }
 
 export function buildEdit(vehicle) {
@@ -80,6 +100,7 @@ export function buildEdit(vehicle) {
     MIN_LENGTH / vehicle.photos.length
   );
   const length = secondsPerPhoto * vehicle.photos.length;
+  const photos = photoClips(vehicle.photos, secondsPerPhoto);
 
   return {
     timeline: {
@@ -87,7 +108,8 @@ export function buildEdit(vehicle) {
       tracks: [
         { clips: [specCard(vehicle, length)] },
         { clips: [dealerBadge(vehicle, length)] },
-        { clips: photoClips(vehicle.photos, secondsPerPhoto) },
+        { clips: photos.upper },
+        { clips: photos.lower },
         {
           clips: [
             {
