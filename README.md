@@ -7,6 +7,7 @@ Clone this repository, or open the directory of the example you want. Each examp
 ## Examples
 
 - [agency-client-social-videos](examples/agency-client-social-videos) renders one short vertical video per agency client from that client's own photos and video clips, ending on a card in the client's brand color. The Edit JSON is built in code, one clip per media item.
+- [automotive-inventory-videos](examples/automotive-inventory-videos) renders one vertical video per vehicle in a dealer inventory from a JSON feed: the photos in sequence with a pan or zoom on each, and an animated specification card. The Edit JSON is built in code, one clip per photo.
 - [bulk-csv-videos](examples/bulk-csv-videos) renders one video per row of a CSV from a single template with merge fields, tracked in a resumable manifest, with an optional AI step where Claude writes each row's headline and image prompt. Companion code for [Generate videos in bulk with an API and an AI agent](https://shotstack.io/learn/bulk-create-videos-from-csv-and-ai/).
 - [elevenlabs-voiceover-video](examples/elevenlabs-voiceover-video) narrates a video in an ElevenLabs voice, cloned from your own sample if you want, uploads the audio through the Ingest API and renders a captioned video.
 - [first-render](examples/first-render) the very basics: submit an Edit, poll the render status, and print the output URL, in Node.js and Python. Start here if you are new to the API. Companion code for [Render your first video with the Shotstack API](https://shotstack.io/learn/render-your-first-video-shotstack-api/).
