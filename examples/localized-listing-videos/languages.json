@@ -1,0 +1,34 @@
+[
+  {
+    "code": "en",
+    "model": "elevenlabs-multilingual-v2",
+    "voice": "Rachel",
+    "script": "Welcome to Aurelia Residences, set among landscaped gardens in the heart of the city. Tall windows and crystal chandeliers fill the rooms with light, and every detail, from the marble floors to the furnishings, is finished with care. There's space to gather, space to unwind, and a home that's ready for you. Book your private viewing today.",
+    "headline": "A quiet retreat in the city",
+    "cta": "Book a private viewing"
+  },
+  {
+    "code": "es",
+    "model": "elevenlabs-multilingual-v2",
+    "voice": "Rachel",
+    "script": "Le damos la bienvenida a Aurelia Residences, entre jardines cuidados en el corazón de la ciudad. Grandes ventanales y lámparas de cristal llenan de luz cada espacio, y cada detalle, desde el mármol hasta el mobiliario, está pensado con esmero. Hay lugar para reunirse, lugar para descansar y un hogar listo para usted. Reserve hoy su visita privada.",
+    "headline": "Un refugio tranquilo en la ciudad",
+    "cta": "Reserve una visita privada"
+  },
+  {
+    "code": "de",
+    "model": "elevenlabs-multilingual-v2",
+    "voice": "Rachel",
+    "script": "Willkommen in den Aurelia Residences, umgeben von gepflegten Gärten im Herzen der Stadt. Hohe Fenster und Kristallleuchter tauchen die Räume in helles Licht, und jedes Detail, vom Marmorboden bis zur Einrichtung, ist mit Sorgfalt gestaltet. Hier ist Raum zum Zusammenkommen, Raum zum Entspannen und ein Zuhause, das auf Sie wartet. Vereinbaren Sie noch heute Ihre private Besichtigung.",
+    "headline": "Ein ruhiger Rückzugsort in der Stadt",
+    "cta": "Vereinbaren Sie eine private Besichtigung"
+  },
+  {
+    "code": "ja",
+    "model": "polly-neural",
+    "voice": "Kazuha",
+    "script": "都心の緑豊かな庭園に囲まれた、アウレリア・レジデンスへようこそ。大きな窓とクリスタルのシャンデリアが室内を光で満たし、大理石の床から家具まで、細部にこだわって仕上げられています。みんなで集える空間も、ゆったりくつろげる空間もそろい、新しい暮らしをすぐに始められます。ぜひ本日、プライベート内覧をご予約ください。",
+    "headline": "都心の静かな隠れ家",
+    "cta": "プライベート内覧をご予約ください"
+  }
+]

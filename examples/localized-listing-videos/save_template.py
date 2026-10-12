@@ -1,0 +1,56 @@
+"""Save template.json as a Shotstack template and print the template ID."""
+
+import json
+import os
+import sys
+from pathlib import Path
+
+import requests
+
+API = "https://api.shotstack.io/edit/v1"
+HERE = Path(__file__).resolve().parent
+
+
+def error_detail(resp):
+    """Return the API's error message as one line."""
+    try:
+        errors = resp.json().get("errors") or [{}]
+        return errors[0].get("detail") or resp.text
+    except (ValueError, AttributeError):
+        return resp.text.strip()[:200]
+
+
+def main():
+    api_key = os.environ.get("SHOTSTACK_API_KEY")
+    if not api_key:
+        raise RuntimeError("Set the SHOTSTACK_API_KEY environment variable first.")
+
+    template_text = (HERE / "template.json").read_text(encoding="utf-8")
+    if "PASTE_FOOTAGE_URL_HERE" in template_text:
+        raise RuntimeError(
+            "Replace PASTE_FOOTAGE_URL_HERE in template.json "
+            "with your footage URL first."
+        )
+
+    resp = requests.post(
+        f"{API}/templates",
+        headers={"x-api-key": api_key},
+        json={"name": "Localized listing video", "template": json.loads(template_text)},
+        timeout=30,
+    )
+    if not resp.ok:
+        raise RuntimeError(
+            f"Could not save the template ({resp.status_code}): {error_detail(resp)}"
+        )
+
+    print(resp.json()["response"]["id"])
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        raise SystemExit(1) from None
+    except Exception as error:
+        print(error, file=sys.stderr)
+        raise SystemExit(1) from error

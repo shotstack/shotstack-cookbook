@@ -1,0 +1,139 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "fonts": [
+      {
+        "src": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf"
+      },
+      {
+        "src": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/SubsetOTF/JP/NotoSansJP-Bold.otf"
+      }
+    ],
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{HEADLINE}}",
+              "font": {
+                "family": "Noto Sans JP",
+                "size": 64,
+                "weight": 700,
+                "color": "#FFFFFF"
+              },
+              "background": {
+                "color": "#000000",
+                "opacity": 0.55,
+                "borderRadius": 16,
+                "wrap": true
+              },
+              "align": { "horizontal": "left", "vertical": "top" },
+              "padding": { "top": 12, "right": 28, "bottom": 14, "left": 28 }
+            },
+            "start": 0,
+            "length": "alias://voice",
+            "width": 1200,
+            "height": 200,
+            "position": "topLeft",
+            "offset": { "x": 0.04, "y": -0.06 },
+            "transition": { "in": "fade" }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-text",
+              "text": "{{CTA}}",
+              "font": {
+                "family": "Noto Sans JP",
+                "size": 38,
+                "weight": 700,
+                "color": "#1A1A1A"
+              },
+              "background": {
+                "color": "#FFFFFF",
+                "opacity": 0.92,
+                "borderRadius": 40,
+                "wrap": true
+              },
+              "align": { "horizontal": "left", "vertical": "top" },
+              "padding": { "top": 10, "right": 26, "bottom": 12, "left": 26 }
+            },
+            "start": 0,
+            "length": "alias://voice",
+            "width": 1200,
+            "height": 110,
+            "position": "topLeft",
+            "offset": { "x": 0.04, "y": -0.25 },
+            "transition": { "in": "fade" }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "rich-caption",
+              "src": "alias://voice",
+              "font": {
+                "family": "Noto Sans JP",
+                "size": 46,
+                "weight": 700,
+                "color": "#FFFFFF"
+              },
+              "background": {
+                "color": "#000000",
+                "opacity": 0.55,
+                "borderRadius": 12,
+                "wrap": true,
+                "padding": 14
+              },
+              "active": { "font": { "color": "#FFD166" } },
+              "animation": { "style": "highlight" },
+              "align": { "horizontal": "center", "vertical": "bottom" }
+            },
+            "start": 0,
+            "length": "end",
+            "width": 1600,
+            "height": 240,
+            "position": "bottom",
+            "offset": { "y": 0.06 }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "alias": "voice",
+            "asset": {
+              "type": "audio",
+              "prompt": "{{SCRIPT}}",
+              "model": "{{MODEL}}",
+              "options": { "voice": "{{VOICE}}" }
+            },
+            "start": 0,
+            "length": "auto"
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "video",
+              "src": "PASTE_FOOTAGE_URL_HERE",
+              "volume": 0
+            },
+            "start": 0,
+            "length": "alias://voice",
+            "transition": { "out": "fade" }
+          }
+        ]
+      }
+    ]
+  },
+  "output": { "format": "mp4", "resolution": "1080", "fps": 30 }
+}
