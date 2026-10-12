@@ -190,6 +190,11 @@ def main():
             continue
         try:
             render_id = submit(language)
+        except requests.ConnectionError:
+            raise SystemExit(
+                "Could not reach Shotstack. Check your network connection "
+                "and run the script again."
+            ) from None
         except (RuntimeError, requests.RequestException) as err:
             print(f"[{code}] {err}")
             failed.append(code)

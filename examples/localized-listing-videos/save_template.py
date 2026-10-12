@@ -51,6 +51,13 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         raise SystemExit(1) from None
+    except requests.ConnectionError:
+        print(
+            "Could not reach Shotstack. Check your network connection "
+            "and run the script again.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from None
     except Exception as error:
         print(error, file=sys.stderr)
         raise SystemExit(1) from error
