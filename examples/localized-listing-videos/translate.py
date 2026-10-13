@@ -56,10 +56,17 @@ def read_json(path):
 def read_languages(path):
     """Read languages.json and check that each entry has a language code."""
     languages = read_json(path)
+    if not isinstance(languages, list) or not languages:
+        raise RuntimeError(f"{path.name} must be a list with at least one language.")
     for number, language in enumerate(languages, start=1):
         if not isinstance(language, dict) or not language.get("code"):
             raise RuntimeError(f"Entry {number} in {path.name} has no code.")
     return languages
+
+
+def filled(language, field):
+    """True if the field has text. render.py uses the same test."""
+    return bool(str(language.get(field) or "").strip())
 
 
 def translate(source, target_code):
@@ -103,7 +110,8 @@ def translate(source, target_code):
         # A blocked prompt has no candidates. A cut-off reply is not valid JSON.
         raise RuntimeError(
             f"[{target_code}] Gemini returned no usable translation "
-            f"({finish_reason(resp)})."
+            f"({finish_reason(resp)}). Run the script again. If it fails again, "
+            "change the source text."
         ) from None
 
 
@@ -122,7 +130,7 @@ def main():
         raise RuntimeError(f"Set the {API_KEY_NAME} environment variable first.")
     languages = read_languages(LANGUAGES_PATH)
     source, targets = languages[0], languages[1:]
-    if not all(source.get(field) for field in FIELDS):
+    if not all(filled(source, field) for field in FIELDS):
         raise RuntimeError(
             f"The first entry ({source['code']}) needs a script, headline and cta."
         )
@@ -137,7 +145,7 @@ def main():
         code = language["code"]
         if only and code not in only:
             continue
-        missing = [field for field in FIELDS if not language.get(field)]
+        missing = [field for field in FIELDS if not filled(language, field)]
         if not missing:
             print(f"[{code}] already translated, skipping")
             continue

@@ -40,13 +40,15 @@ def error_detail(resp):
     try:
         body = resp.json()
         if body.get("errors"):
-            return body["errors"][0]["detail"]
-        response = body.get("response")
-        if isinstance(response, dict):
-            response = response.get("error") or response.get("message")
-        return str(response or body["message"])
+            detail = body["errors"][0].get("detail")
+        else:
+            detail = body.get("response")
+            if isinstance(detail, dict):
+                detail = detail.get("error") or detail.get("message")
+            detail = detail or body.get("message")
     except Exception:
-        return resp.text.strip()[:200]
+        detail = None
+    return str(detail) if detail else resp.text.strip()[:200]
 
 
 def read_json(path):
@@ -60,6 +62,8 @@ def read_json(path):
 def read_languages(path):
     """Read languages.json and check that each entry has a language code."""
     languages = read_json(path)
+    if not isinstance(languages, list) or not languages:
+        raise RuntimeError(f"{path.name} must be a list with at least one language.")
     for number, language in enumerate(languages, start=1):
         if not isinstance(language, dict) or not language.get("code"):
             raise RuntimeError(f"Entry {number} in {path.name} has no code.")
@@ -155,7 +159,11 @@ def wait_for(code, render_id):
 def can_resume(render_id):
     """True if a render from an earlier run is still running or has finished."""
     try:
-        return get_render(render_id)["status"] != "failed"
+        render = get_render(render_id)
+        # A "done" render with no URL cannot be downloaded, so render it again.
+        return render["status"] != "failed" and (
+            render["status"] != "done" or bool(render.get("url"))
+        )
     except requests.ConnectionError:
         raise  # the network is down; main() stops with one line
     except requests.RequestException:
@@ -208,7 +216,7 @@ def main():
     incomplete = [
         language["code"]
         for language in languages
-        if not all(str(language.get(field, "")).strip() for field in fields)
+        if not all(str(language.get(field) or "").strip() for field in fields)
     ]
     if incomplete:
         raise RuntimeError(
@@ -223,6 +231,7 @@ def main():
     # Start (or pick up) every render first so they run at the same time.
     pending = {}
     failed = []
+    no_answer = []
     for language in languages:
         code = language["code"]
         fp = fingerprint(language)
@@ -243,11 +252,8 @@ def main():
             raise
         except requests.Timeout:
             # Shotstack may have accepted the render, but there is no ID to log.
-            print(
-                f"[{code}] Shotstack did not answer in time. The render may have "
-                "started. If you run the script again, it starts another render."
-            )
-            failed.append(code)
+            print(f"[{code}] Shotstack did not answer in time.")
+            no_answer.append(code)
             continue
         except (RuntimeError, requests.RequestException) as err:
             print(f"[{code}] {err}")
@@ -284,10 +290,18 @@ def main():
             print(f"[{code}] {err}")
         save_log(log)
 
+    messages = []
     if failed:
-        raise SystemExit(
+        messages.append(
             f"Not rendered: {', '.join(failed)}. Run the script again to retry them."
         )
+    if no_answer:
+        messages.append(
+            f"No answer for: {', '.join(no_answer)}. These renders may have started. "
+            "If you run the script again, they render again and use credits again."
+        )
+    if messages:
+        raise SystemExit(" ".join(messages))
 
 
 if __name__ == "__main__":

@@ -18,13 +18,15 @@ def error_detail(resp):
     try:
         body = resp.json()
         if body.get("errors"):
-            return body["errors"][0]["detail"]
-        response = body.get("response")
-        if isinstance(response, dict):
-            response = response.get("error") or response.get("message")
-        return str(response or body["message"])
+            detail = body["errors"][0].get("detail")
+        else:
+            detail = body.get("response")
+            if isinstance(detail, dict):
+                detail = detail.get("error") or detail.get("message")
+            detail = detail or body.get("message")
     except Exception:
-        return resp.text.strip()[:200]
+        detail = None
+    return str(detail) if detail else resp.text.strip()[:200]
 
 
 def main():
