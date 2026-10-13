@@ -40,7 +40,7 @@ def error_detail(resp):
     try:
         body = resp.json()
         if body.get("errors"):
-            detail = body["errors"][0].get("detail")
+            detail = body["errors"][0].get("detail") or body["errors"][0].get("title")
         else:
             detail = body.get("response")
             if isinstance(detail, dict):
@@ -48,7 +48,7 @@ def error_detail(resp):
             detail = detail or body.get("message")
     except Exception:
         detail = None
-    return str(detail) if detail else resp.text.strip()[:200]
+    return str(detail) if detail else resp.text.strip()[:200] or resp.reason
 
 
 def read_json(path):
@@ -67,6 +67,12 @@ def read_languages(path):
     for number, language in enumerate(languages, start=1):
         if not isinstance(language, dict) or not language.get("code"):
             raise RuntimeError(f"Entry {number} in {path.name} has no code.")
+    codes = [language["code"] for language in languages]
+    repeated = sorted({code for code in codes if codes.count(code) > 1})
+    if repeated:
+        raise RuntimeError(
+            f"Codes used more than once in {path.name}: {', '.join(repeated)}"
+        )
     return languages
 
 
@@ -255,7 +261,7 @@ def main():
             print(f"[{code}] Shotstack did not answer in time.")
             no_answer.append(code)
             continue
-        except (RuntimeError, requests.RequestException) as err:
+        except Exception as err:
             print(f"[{code}] {err}")
             failed.append(code)
             continue
@@ -284,7 +290,7 @@ def main():
                 # A server error is temporary: keep the render, so the next run
                 # downloads it again without paying for a new render.
                 log[code] = failed_entry(render_id, fp)
-        except (RuntimeError, requests.RequestException) as err:
+        except Exception as err:
             log[code] = failed_entry(render_id, fp)
             failed.append(code)
             print(f"[{code}] {err}")

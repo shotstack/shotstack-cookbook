@@ -87,8 +87,12 @@ prints the status of each render until it is done. It saves each video as
 
 The script writes each render ID to `output/renders.json`. When you run it
 again, it skips the videos that are done and not changed. It continues the
-renders that did not finish. It starts new renders only for new or changed
+renders that did not finish. It starts new renders for new, changed or failed
 languages.
+
+Sometimes Shotstack does not answer a render request in time. The script then
+names the language. The render can still start. If you run the script again,
+that language renders again and uses credits again.
 
 If you save the template again, the template gets a new ID. Then all the
 languages render again.

@@ -61,6 +61,12 @@ def read_languages(path):
     for number, language in enumerate(languages, start=1):
         if not isinstance(language, dict) or not language.get("code"):
             raise RuntimeError(f"Entry {number} in {path.name} has no code.")
+    codes = [language["code"] for language in languages]
+    repeated = sorted({code for code in codes if codes.count(code) > 1})
+    if repeated:
+        raise RuntimeError(
+            f"Codes used more than once in {path.name}: {', '.join(repeated)}"
+        )
     return languages
 
 
@@ -105,6 +111,8 @@ def translate(source, target_code):
             part.get("text", "") for part in parts if not part.get("thought")
         )
         result = json.loads(text)
+        if not all(filled(result, field) for field in FIELDS):
+            raise ValueError("empty field")
         return {field: result[field].strip() for field in FIELDS}
     except Exception:
         # A blocked prompt has no candidates. A cut-off reply is not valid JSON.

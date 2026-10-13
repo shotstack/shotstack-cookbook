@@ -18,7 +18,7 @@ def error_detail(resp):
     try:
         body = resp.json()
         if body.get("errors"):
-            detail = body["errors"][0].get("detail")
+            detail = body["errors"][0].get("detail") or body["errors"][0].get("title")
         else:
             detail = body.get("response")
             if isinstance(detail, dict):
@@ -26,7 +26,7 @@ def error_detail(resp):
             detail = detail or body.get("message")
     except Exception:
         detail = None
-    return str(detail) if detail else resp.text.strip()[:200]
+    return str(detail) if detail else resp.text.strip()[:200] or resp.reason
 
 
 def main():
