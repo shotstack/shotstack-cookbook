@@ -36,10 +36,19 @@ CONNECTION_RETRIES = 6
 def error_detail(resp):
     """Return the API's error message as one line."""
     try:
-        errors = resp.json().get("errors") or [{}]
-        return errors[0].get("detail") or resp.text
-    except (ValueError, AttributeError):
+        body = resp.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
         return resp.text.strip()[:200]
+    # A rejected key comes back as {"errors": [...]}. Other Edit API errors
+    # come back as {"message": ..., "response": ...}.
+    if body.get("errors"):
+        return body["errors"][0].get("detail") or resp.text.strip()[:200]
+    response = body.get("response")
+    if isinstance(response, dict):
+        response = response.get("error") or response.get("message")
+    return str(response or body.get("message") or resp.text.strip()[:200])
 
 
 def merge_fields(language):
@@ -177,6 +186,18 @@ def main():
         if unknown:
             raise SystemExit(f"Not in languages.json: {', '.join(sorted(unknown))}")
         languages = [language for language in languages if language["code"] in only]
+    # Each render uses credits, so stop before any render if a field is empty.
+    fields = ("model", "voice", "script", "headline", "cta")
+    incomplete = [
+        language["code"]
+        for language in languages
+        if not all(language.get(field) for field in fields)
+    ]
+    if incomplete:
+        raise RuntimeError(
+            f"Fill in {', '.join(fields)} in languages.json for: "
+            f"{', '.join(incomplete)}. Or run translate.py to fill them."
+        )
     OUTPUT_DIR.mkdir(exist_ok=True)
     log = {}
     if LOG_PATH.exists():
@@ -195,7 +216,10 @@ def main():
             print(f"[{code}] already rendered, skipping")
             continue
         render_id = entry.get("render_id")
-        if unchanged and render_id and can_resume(render_id):
+        # A "done" entry with no video means the file was deleted. Its temporary
+        # URL may have expired, so render it again.
+        resumable = unchanged and render_id and entry.get("status") != "done"
+        if resumable and can_resume(render_id):
             print(f"[{code}] picking up render {entry['render_id']}")
             pending[code] = (entry["render_id"], fp)
             continue
@@ -203,6 +227,12 @@ def main():
             render_id = submit(language)
         except requests.ConnectionError:
             raise
+        except requests.Timeout:
+            # Shotstack may have accepted the render. A new run would pay twice.
+            raise SystemExit(
+                f"[{code}] Shotstack did not answer in time, so the render may have "
+                "started. Check your renders in the dashboard before you run again."
+            ) from None
         except (RuntimeError, requests.RequestException) as err:
             print(f"[{code}] {err}")
             failed.append(code)

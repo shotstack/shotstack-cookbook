@@ -63,12 +63,12 @@ def main():
         if status == "ready":
             print(attributes["source"])
             return
-        if status in ("failed", "deleted"):
+        if status in ("failed", "deleted", "overwritten"):
             raise RuntimeError(f"Ingest {status} for source {source_id}")
         time.sleep(POLL_SECONDS)
     raise RuntimeError(
         f"Source {source_id} was not ready after {TIMEOUT_SECONDS} seconds. "
-        "Run the script again."
+        f"Do not upload it again. Check it later at {API}/sources/{source_id}"
     )
 
 
