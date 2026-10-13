@@ -45,6 +45,23 @@ Source copy:
 """
 
 
+def read_json(path):
+    """Read a JSON file, or stop with one line that names the file."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as err:
+        raise RuntimeError(f"{path.name} is not valid JSON: {err}") from None
+
+
+def read_languages(path):
+    """Read languages.json and check that each entry has a language code."""
+    languages = read_json(path)
+    for number, language in enumerate(languages, start=1):
+        if not isinstance(language, dict) or not language.get("code"):
+            raise RuntimeError(f"Entry {number} in {path.name} has no code.")
+    return languages
+
+
 def translate(source, target_code):
     """Translate the source entry's script, headline and cta into one language."""
     prompt = INSTRUCTIONS.format(source=source["code"], target=target_code)
@@ -103,7 +120,7 @@ def finish_reason(resp):
 def main():
     if not API_KEY:
         raise RuntimeError(f"Set the {API_KEY_NAME} environment variable first.")
-    languages = json.loads(LANGUAGES_PATH.read_text(encoding="utf-8"))
+    languages = read_languages(LANGUAGES_PATH)
     source, targets = languages[0], languages[1:]
     if not all(source.get(field) for field in FIELDS):
         raise RuntimeError(

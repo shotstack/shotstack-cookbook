@@ -49,6 +49,23 @@ def error_detail(resp):
         return resp.text.strip()[:200]
 
 
+def read_json(path):
+    """Read a JSON file, or stop with one line that names the file."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as err:
+        raise RuntimeError(f"{path.name} is not valid JSON: {err}") from None
+
+
+def read_languages(path):
+    """Read languages.json and check that each entry has a language code."""
+    languages = read_json(path)
+    for number, language in enumerate(languages, start=1):
+        if not isinstance(language, dict) or not language.get("code"):
+            raise RuntimeError(f"Entry {number} in {path.name} has no code.")
+    return languages
+
+
 def merge_fields(language):
     """Map one languages.json entry to the template's merge fields."""
     return [
@@ -124,6 +141,8 @@ def wait_for(code, render_id):
             last_status = render["status"]
             print(f"[{code}] {last_status}")
         if last_status == "done":
+            if not render.get("url"):
+                raise RuntimeError("render is done but has no video URL")
             return render["url"]
         if last_status == "failed":
             raise RuntimeError(f"render failed: {render.get('error')}")
@@ -177,7 +196,7 @@ def main():
             "Set the SHOTSTACK_TEMPLATE_ID environment variable first. "
             "Run save_template.py to get the ID."
         )
-    languages = json.loads((HERE / "languages.json").read_text(encoding="utf-8"))
+    languages = read_languages(HERE / "languages.json")
     only = set(sys.argv[1:])
     if only:
         unknown = only - {language["code"] for language in languages}
@@ -199,7 +218,7 @@ def main():
     OUTPUT_DIR.mkdir(exist_ok=True)
     log = {}
     if LOG_PATH.exists():
-        log = json.loads(LOG_PATH.read_text(encoding="utf-8"))
+        log = read_json(LOG_PATH)
 
     # Start (or pick up) every render first so they run at the same time.
     pending = {}

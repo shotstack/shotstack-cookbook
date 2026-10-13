@@ -12,7 +12,7 @@ Related guide: [Video localization API: render one template in multiple language
 
 - A [Shotstack account](https://dashboard.shotstack.io/register) and your
   **production** API key
-- Python 3.8 or later, with `requests` 2 or later
+- Python 3.8 or later, with `requests` 2.18 or later
 - A video that is longer than your longest voice-over, as a file or at a
   public URL
 - Optional: a [Gemini API key](https://aistudio.google.com/apikey) for
@@ -67,8 +67,9 @@ python3 render.py
 
 To translate with a language model, use `translate.py`. It reads the first
 entry in `languages.json` as the source language. For each other language,
-keep `code`, `model` and `voice`, and make `script`, `headline` and `cta`
-empty. Set `GEMINI_API_KEY` in `.env`, load `.env` again, and run:
+keep `code`, `model` and `voice`. Make `script`, `headline` and `cta` empty.
+
+Set `GEMINI_API_KEY` in `.env`. Load `.env` again. Then run:
 
 ```bash
 python3 translate.py
