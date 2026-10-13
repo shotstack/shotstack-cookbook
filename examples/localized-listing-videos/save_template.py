@@ -13,20 +13,18 @@ HERE = Path(__file__).resolve().parent
 
 def error_detail(resp):
     """Return the API's error message as one line."""
-    try:
-        body = resp.json()
-    except ValueError:
-        body = None
-    if not isinstance(body, dict):
-        return resp.text.strip()[:200]
     # A rejected key comes back as {"errors": [...]}. Other Shotstack errors
     # come back as {"message": ..., "response": ...}.
-    if body.get("errors"):
-        return body["errors"][0].get("detail") or resp.text.strip()[:200]
-    response = body.get("response")
-    if isinstance(response, dict):
-        response = response.get("error") or response.get("message")
-    return str(response or body.get("message") or resp.text.strip()[:200])
+    try:
+        body = resp.json()
+        if body.get("errors"):
+            return body["errors"][0]["detail"]
+        response = body.get("response")
+        if isinstance(response, dict):
+            response = response.get("error") or response.get("message")
+        return str(response or body["message"])
+    except Exception:
+        return resp.text.strip()[:200]
 
 
 def main():

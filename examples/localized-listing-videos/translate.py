@@ -74,8 +74,8 @@ def translate(source, target_code):
         raise RuntimeError(
             f"[{target_code}] translation failed ({resp.status_code}): {detail}"
         )
-    body = resp.json()
     try:
+        body = resp.json()
         parts = body["candidates"][0]["content"]["parts"]
         text = "".join(
             part.get("text", "") for part in parts if not part.get("thought")
@@ -84,13 +84,20 @@ def translate(source, target_code):
         return {field: result[field].strip() for field in FIELDS}
     except Exception:
         # A blocked prompt has no candidates. A cut-off reply is not valid JSON.
-        reason = body.get("promptFeedback", {}).get("blockReason") or (
-            body.get("candidates") or [{}]
-        )[0].get("finishReason")
         raise RuntimeError(
             f"[{target_code}] Gemini returned no usable translation "
-            f"({reason or 'unknown reason'}). Run the script again."
+            f"({finish_reason(resp)})."
         ) from None
+
+
+def finish_reason(resp):
+    """Return why Gemini gave no usable reply, such as SAFETY or MAX_TOKENS."""
+    try:
+        body = resp.json()
+        feedback = body.get("promptFeedback") or {}
+        return feedback.get("blockReason") or body["candidates"][0]["finishReason"]
+    except Exception:
+        return "unknown reason"
 
 
 def main():

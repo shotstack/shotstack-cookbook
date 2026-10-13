@@ -16,20 +16,18 @@ TIMEOUT_SECONDS = 15 * 60
 
 def error_detail(resp):
     """Return the API's error message as one line."""
-    try:
-        body = resp.json()
-    except ValueError:
-        body = None
-    if not isinstance(body, dict):
-        return resp.text.strip()[:200]
     # A rejected key comes back as {"errors": [...]}. Other Shotstack errors
     # come back as {"message": ..., "response": ...}.
-    if body.get("errors"):
-        return body["errors"][0].get("detail") or resp.text.strip()[:200]
-    response = body.get("response")
-    if isinstance(response, dict):
-        response = response.get("error") or response.get("message")
-    return str(response or body.get("message") or resp.text.strip()[:200])
+    try:
+        body = resp.json()
+        if body.get("errors"):
+            return body["errors"][0]["detail"]
+        response = body.get("response")
+        if isinstance(response, dict):
+            response = response.get("error") or response.get("message")
+        return str(response or body["message"])
+    except Exception:
+        return resp.text.strip()[:200]
 
 
 def check(resp, action):
@@ -67,7 +65,8 @@ def main():
         response = requests.get(
             f"{API}/sources/{source_id}", headers=headers, timeout=30
         )
-        attributes = check(response, "check the upload").json()["data"]["attributes"]
+        action = f"check source {source_id}"
+        attributes = check(response, action).json()["data"]["attributes"]
         status = attributes["status"]
         if status == "ready":
             print(attributes["source"])
@@ -77,7 +76,8 @@ def main():
         time.sleep(POLL_SECONDS)
     raise RuntimeError(
         f"Source {source_id} was not ready after {TIMEOUT_SECONDS} seconds. "
-        f"Do not upload it again. Check it later at {API}/sources/{source_id}"
+        "Do not upload the file again. "
+        f"Get its status later with GET {API}/sources/{source_id}"
     )
 
 

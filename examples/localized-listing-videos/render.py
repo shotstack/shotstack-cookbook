@@ -35,20 +35,18 @@ CONNECTION_RETRIES = 6
 
 def error_detail(resp):
     """Return the API's error message as one line."""
-    try:
-        body = resp.json()
-    except ValueError:
-        body = None
-    if not isinstance(body, dict):
-        return resp.text.strip()[:200]
     # A rejected key comes back as {"errors": [...]}. Other Shotstack errors
     # come back as {"message": ..., "response": ...}.
-    if body.get("errors"):
-        return body["errors"][0].get("detail") or resp.text.strip()[:200]
-    response = body.get("response")
-    if isinstance(response, dict):
-        response = response.get("error") or response.get("message")
-    return str(response or body.get("message") or resp.text.strip()[:200])
+    try:
+        body = resp.json()
+        if body.get("errors"):
+            return body["errors"][0]["detail"]
+        response = body.get("response")
+        if isinstance(response, dict):
+            response = response.get("error") or response.get("message")
+        return str(response or body["message"])
+    except Exception:
+        return resp.text.strip()[:200]
 
 
 def merge_fields(language):
@@ -191,7 +189,7 @@ def main():
     incomplete = [
         language["code"]
         for language in languages
-        if not all(language.get(field) for field in fields)
+        if not all(str(language.get(field, "")).strip() for field in fields)
     ]
     if incomplete:
         raise RuntimeError(
@@ -216,10 +214,7 @@ def main():
             print(f"[{code}] already rendered, skipping")
             continue
         render_id = entry.get("render_id")
-        # A "done" entry with no video means the file was deleted. Its temporary
-        # URL may have expired, so render it again.
-        resumable = unchanged and render_id and entry.get("status") != "done"
-        if resumable and can_resume(render_id):
+        if unchanged and render_id and can_resume(render_id):
             print(f"[{code}] picking up render {entry['render_id']}")
             pending[code] = (entry["render_id"], fp)
             continue
@@ -228,11 +223,13 @@ def main():
         except requests.ConnectionError:
             raise
         except requests.Timeout:
-            # Shotstack may have accepted the render. A new run would pay twice.
-            raise SystemExit(
+            # Shotstack may have accepted the render, but there is no ID to log.
+            print(
                 f"[{code}] Shotstack did not answer in time. The render may have "
                 "started. If you run the script again, it starts another render."
-            ) from None
+            )
+            failed.append(code)
+            continue
         except (RuntimeError, requests.RequestException) as err:
             print(f"[{code}] {err}")
             failed.append(code)
