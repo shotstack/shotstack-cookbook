@@ -1,7 +1,8 @@
 # Localized listing videos
 
 Render one property listing video in English, Spanish, German and Japanese
-from one saved template. Each language gets its own AI voice-over, captions,
+from one saved template. Use it for listings that you sell to buyers in other
+countries. Each language gets its own AI voice-over, captions,
 headline and call to action. You get one MP4 file for each language in
 `output/`.
 
