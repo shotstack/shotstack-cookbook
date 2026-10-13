@@ -9,7 +9,7 @@ Running the script again skips videos already finished with the same template
 ID and text, picks up renders that were still running (or finished after the
 script stopped), and starts new renders for new, changed or failed languages.
 
-Pass language codes to render only those, e.g. `python render.py ja`.
+Pass language codes to render only those, e.g. `python3 render.py ja`.
 """
 
 import hashlib
@@ -30,6 +30,7 @@ OUTPUT_DIR = HERE / "output"
 LOG_PATH = OUTPUT_DIR / "renders.json"
 POLL_SECONDS = 5
 TIMEOUT_SECONDS = 15 * 60
+CONNECTION_RETRIES = 6
 
 
 def error_detail(resp):
@@ -93,17 +94,25 @@ def wait_for(code, render_id):
     """Poll until the render is done or failed, printing each new status.
 
     The render keeps running on Shotstack's side if this script loses its
-    connection, so connection problems are retried until the timeout.
+    connection. Server errors are retried until the timeout. A lost network is
+    retried CONNECTION_RETRIES times, then the script stops and the next run
+    picks the render up.
     """
     deadline = time.monotonic() + TIMEOUT_SECONDS
     last_status = None
+    connection_failures = 0
     while time.monotonic() < deadline:
         try:
             render = get_render(render_id)
         except requests.RequestException as err:
+            if isinstance(err, requests.ConnectionError):
+                connection_failures += 1
+                if connection_failures > CONNECTION_RETRIES:
+                    raise
             print(f"[{code}] connection problem, retrying ({type(err).__name__})")
             time.sleep(POLL_SECONDS)
             continue
+        connection_failures = 0
         if render["status"] != last_status:
             last_status = render["status"]
             print(f"[{code}] {last_status}")
@@ -121,6 +130,8 @@ def can_resume(render_id):
     """True if a render from an earlier run is still running or has finished."""
     try:
         return get_render(render_id)["status"] != "failed"
+    except requests.ConnectionError:
+        raise  # the network is down; main() stops with one line
     except requests.RequestException:
         return True  # no answer yet; wait_for() keeps trying
     except RuntimeError:
@@ -191,10 +202,7 @@ def main():
         try:
             render_id = submit(language)
         except requests.ConnectionError:
-            raise SystemExit(
-                "Could not reach Shotstack. Check your network connection "
-                "and run the script again."
-            ) from None
+            raise
         except (RuntimeError, requests.RequestException) as err:
             print(f"[{code}] {err}")
             failed.append(code)
@@ -210,6 +218,9 @@ def main():
             download(url, OUTPUT_DIR / f"{code}.mp4")
             log[code] = {"render_id": render_id, "fingerprint": fp, "status": "done"}
             print(f"[{code}] saved to output/{code}.mp4")
+        except requests.ConnectionError:
+            # Keep the "submitted" entry, so the next run picks the render up.
+            raise
         except requests.HTTPError as err:
             failed.append(code)
             print(f"[{code}] download failed: {err}")
@@ -238,6 +249,13 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         # Renders already started keep running. The next run picks them up.
+        raise SystemExit(1) from None
+    except requests.ConnectionError:
+        print(
+            "Could not reach Shotstack. Check your network connection "
+            "and run the script again.",
+            file=sys.stderr,
+        )
         raise SystemExit(1) from None
     except Exception as error:
         print(error, file=sys.stderr)

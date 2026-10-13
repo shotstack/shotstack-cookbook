@@ -6,7 +6,7 @@ translate the source entry and writes the result back to languages.json.
 Fields that already have text are never changed, so a translation you have
 reviewed stays as it is. To translate a field again, empty it and rerun.
 
-Pass language codes to translate only those, e.g. `python translate.py de`.
+Pass language codes to translate only those, e.g. `python3 translate.py de`.
 """
 
 import json

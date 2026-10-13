@@ -1,6 +1,6 @@
 """Upload a local video file to Shotstack's Ingest API and print its hosted URL.
 
-Usage: python upload_footage.py path/to/footage.mp4
+Usage: python3 upload_footage.py path/to/footage.mp4
 """
 
 import os
@@ -36,7 +36,7 @@ def main():
     if not api_key:
         raise RuntimeError("Set the SHOTSTACK_API_KEY environment variable first.")
     if len(sys.argv) != 2:
-        raise RuntimeError("Usage: python upload_footage.py <path-to-video>")
+        raise RuntimeError("Usage: python3 upload_footage.py <path-to-video>")
     path = sys.argv[1]
     if not os.path.isfile(path):
         raise RuntimeError(f"File not found: {path}")
