@@ -41,7 +41,7 @@ def error_detail(resp):
         body = None
     if not isinstance(body, dict):
         return resp.text.strip()[:200]
-    # A rejected key comes back as {"errors": [...]}. Other Edit API errors
+    # A rejected key comes back as {"errors": [...]}. Other Shotstack errors
     # come back as {"message": ..., "response": ...}.
     if body.get("errors"):
         return body["errors"][0].get("detail") or resp.text.strip()[:200]
@@ -195,8 +195,8 @@ def main():
     ]
     if incomplete:
         raise RuntimeError(
-            f"Fill in {', '.join(fields)} in languages.json for: "
-            f"{', '.join(incomplete)}. Or run translate.py to fill them."
+            f"Empty fields in languages.json for: {', '.join(incomplete)}. "
+            "Set model and voice. Run translate.py to fill script, headline and cta."
         )
     OUTPUT_DIR.mkdir(exist_ok=True)
     log = {}
@@ -230,8 +230,8 @@ def main():
         except requests.Timeout:
             # Shotstack may have accepted the render. A new run would pay twice.
             raise SystemExit(
-                f"[{code}] Shotstack did not answer in time, so the render may have "
-                "started. Check your renders in the dashboard before you run again."
+                f"[{code}] Shotstack did not answer in time. The render may have "
+                "started. If you run the script again, it starts another render."
             ) from None
         except (RuntimeError, requests.RequestException) as err:
             print(f"[{code}] {err}")

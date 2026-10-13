@@ -19,7 +19,7 @@ def error_detail(resp):
         body = None
     if not isinstance(body, dict):
         return resp.text.strip()[:200]
-    # A rejected key comes back as {"errors": [...]}. Other Edit API errors
+    # A rejected key comes back as {"errors": [...]}. Other Shotstack errors
     # come back as {"message": ..., "response": ...}.
     if body.get("errors"):
         return body["errors"][0].get("detail") or resp.text.strip()[:200]
