@@ -112,10 +112,15 @@ def submit(language):
     return resp.json()["response"]["id"]
 
 
+def is_temporary(status_code):
+    """True for a rate limit, a timeout or a server error: try again later."""
+    return status_code is None or status_code >= 500 or status_code in (408, 429)
+
+
 def get_render(render_id):
     resp = requests.get(f"{API}/render/{render_id}", headers=HEADERS, timeout=30)
-    if resp.status_code >= 500 or resp.status_code == 429:
-        # A server error or rate limit is retried like a connection problem.
+    if is_temporary(resp.status_code):
+        # A temporary error is retried like a connection problem.
         resp.raise_for_status()
     if not resp.ok:
         raise RuntimeError(
@@ -282,14 +287,15 @@ def main():
         except requests.HTTPError as err:
             failed.append(code)
             print(f"[{code}] download failed: {err}")
-            if err.response is not None and err.response.status_code < 500:
+            status = err.response.status_code if err.response is not None else None
+            if is_temporary(status):
+                # Keep the render, so the next run downloads it again without
+                # paying for a new render.
+                log[code] = failed_entry(render_id, fp)
+            else:
                 # The temporary URL has probably expired, so forget this render
                 # and start a new one next run.
                 log.pop(code, None)
-            else:
-                # A server error is temporary: keep the render, so the next run
-                # downloads it again without paying for a new render.
-                log[code] = failed_entry(render_id, fp)
         except Exception as err:
             log[code] = failed_entry(render_id, fp)
             failed.append(code)

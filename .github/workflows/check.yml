@@ -23,3 +23,10 @@ jobs:
 
       # Passes trivially until an example ships Python.
       - run: pip install ruff==0.16.1 && ruff check .
+
+      # Runs the unit tests of each Python example that has a test_*.py file.
+      - run: |
+          pip install requests==2.34.2
+          for dir in $(git ls-files 'examples/*/test_*.py' | xargs -r -n1 dirname | sort -u); do
+            python -m unittest discover -s "$dir" -v
+          done
