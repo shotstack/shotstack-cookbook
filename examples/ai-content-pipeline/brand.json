@@ -1,0 +1,111 @@
+{
+  "name": "Field & Fold",
+  "colors": {
+    "panel": "#9b3b2c",
+    "text": "#eef1f2",
+    "mark": "#ecccc6"
+  },
+  "font": {
+    "family": "Inter",
+    "src": "https://fonts.gstatic.com/s/inter/v20/UcCo3FwrK3iLTfvlaQc78lA2.ttf"
+  },
+  "layout": {
+    "titleMax": 13,
+    "detailMax": 17
+  },
+  "labels": {
+    "new": "New in",
+    "bestseller": "Bestseller",
+    "restock": "Back in stock",
+    "small-batch": "Small batch",
+    "gift": "Gift idea"
+  },
+  "voice": {
+    "tone": "Warm, confident and short, like a good shop window. Two beats: a hook that names the product (back, new, meet the...), then one line about how it feels or fits into someone's day. Sell the moment, not the spec sheet.",
+    "maxWords": 12,
+    "avoid": [
+      "best",
+      "ultimate",
+      "amazing",
+      "perfect",
+      "game-changer",
+      "revolutionary",
+      "unleash",
+      "elevate",
+      "must-have",
+      "iconic",
+      "luxe",
+      "stunning"
+    ],
+    "claimsNeedData": [
+      "organic",
+      "recycled",
+      "sustainable",
+      "ethical",
+      "handmade",
+      "handcrafted",
+      "by hand",
+      "waterproof",
+      "lifetime",
+      "eco-friendly",
+      "vegan"
+    ],
+    "avoidPatterns": [
+      "listing more than two features",
+      "describing how a part works (drains, adjusts, attaches)",
+      "repeating the hook idea in other words"
+    ],
+    "hooks": {
+      "new": "open with Meet the... or New in:",
+      "bestseller": "open with Our bestselling...",
+      "restock": "open with Our ... is back.",
+      "small-batch": "open with Made in small batches:",
+      "gift": "open as a gift idea"
+    },
+    "examples": [
+      "Our linen shirt is back. Light and made to be lived in.",
+      "The stoneware mug. Just the right weight for the first coffee.",
+      "Meet the brass desk lamp. Warm light for late ideas.",
+      "Canvas sneakers, made for long days and longer walks."
+    ]
+  },
+  "voiceover": {
+    "model": "elevenlabs-multilingual-v2",
+    "voice": "Sarah"
+  },
+  "visual": {
+    "backdrops": [
+      "brick-red",
+      "chalk-white",
+      "deep navy",
+      "mustard-yellow",
+      "blush-pink",
+      "deep forest-green"
+    ],
+    "shot": "Studio product photo, vertical framing. The exact product from the reference image, alone, on a {backdrop} seamless paper backdrop, {light}. Keep the product's color, shape, material and details exactly as in the reference.",
+    "scenes": {
+      "Textiles": "Photo, vertical framing. The exact product from the reference image hanging from a wooden peg on a {backdrop} painted kitchen wall, front facing the camera, its ties hanging loose. Below it, the edge of a pale wooden worktop lightly dusted with flour, with a small heap of flour and a wooden rolling pin. {light}. Keep the product's color, shape, material and details exactly as in the reference."
+    },
+    "light": "soft natural side light, a gentle shadow",
+    "rules": [
+      "Product only: no people, faces, hands or body parts.",
+      "No text, logos, labels or packaging.",
+      "No window, no props except the ones the shot describes, and nothing that could be mistaken for a second product."
+    ],
+    "motion": {
+      "Apparel": "A soft breeze lifts the hem and sleeves, which sway and slowly settle.",
+      "Textiles": "The apron has just been hung on the peg: it swings gently and settles, its long ties swaying. A soft puff of flour rises from the worktop and drifts slowly through the light, then settles.",
+      "Ceramics": "A small green seedling pushes up out of the planter and grows into a lush leafy plant, new leaves unfurling one after another. The planter and its saucer never move.",
+      "Lighting": "The lamp sways gently on its cord, then switches on; warm light glows through the shade and throws patterned shadows across the backdrop.",
+      "Glassware": "The water inside ripples gently and light shimmers through the glass onto the backdrop."
+    },
+    "camera": "The camera stays still or slowly pushes in, and the motion is clearly visible. The product never turns or rotates, so no unseen side is shown, and its shape, color and details never change. No people or hands appear."
+  },
+  "music": {
+    "model": "elevenlabs-music",
+    "prompt": "Warm, calm acoustic background track, soft guitar and light percussion, 90 BPM, unhurried, instrumental only",
+    "options": {
+      "forceInstrumental": true
+    }
+  }
+}

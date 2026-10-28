@@ -1,0 +1,15 @@
+{
+  "name": "ai-content-pipeline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Make on-brand 9:16 product videos from a brand guide and a product CSV, with AI generation and automatic checks",
+  "type": "module",
+  "scripts": {
+    "dry": "node pipeline.js --dry",
+    "start": "node --env-file-if-exists=.env pipeline.js",
+    "format": "npx prettier@3 --write ."
+  },
+  "engines": {
+    "node": ">=22.9"
+  }
+}
