@@ -22,7 +22,6 @@ Environment variables:
 """
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -89,7 +88,10 @@ class Manifest(dict):
                 )
 
     def save(self):
-        self.path.write_text(json.dumps(self, indent=2))
+        # Write a new file, then swap it in, so a crash can't leave half a manifest
+        temp = self.path.with_suffix(".tmp")
+        temp.write_text(json.dumps(self, indent=2))
+        os.replace(temp, self.path)
 
 
 # ---------------------------------------- Shotstack requests
@@ -154,7 +156,12 @@ def post_json(url, body):
     # A server error can come after the job was created, so it isn't sent again either.
     if response.status_code >= 500:
         raise Unresolved(f"HTTP {response.status_code}")
-    return check(response)
+    try:
+        return check(response)
+    except ApiError:
+        if response.ok:  # accepted, but the reply can't be read
+            raise Unresolved("the reply wasn't a JSON object") from None
+        raise
 
 
 def get_json(url):
@@ -333,7 +340,7 @@ def sentences(cues):
         if start is None:
             start = cue.start
         parts.append(cue.text.strip())
-        if cue.text.rstrip().endswith((".", "?", "!")):
+        if cue.text.rstrip().rstrip("\"'”’)").endswith((".", "?", "!", "…")):
             result.append(Cue(start, cue.end, " ".join(parts)))
             parts, start = [], None
     if parts:
@@ -364,47 +371,55 @@ def find(target, stream, after=0):
             yield stream[k][1], stream[k + len(target) - 1][1]
 
 
+class AiError(Exception):
+    """The AI provider couldn't be reached, or answered with an error."""
+
+
 def ask_ai(messages):
     """One request to the AI model through the OpenAI-compatible chat API, which
     OpenAI, Anthropic, Google Gemini and many other providers offer. Returns the
-    text of the reply."""
+    text of the reply. Network errors, rate limits and server errors are tried
+    again, because a request to the model can't start a render."""
     url = f"{AI_BASE_URL}/chat/completions"
-    try:
-        response = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {AI_API_KEY}"},
-            json={"model": AI_MODEL, "messages": messages},
-            timeout=AI_TIMEOUT,
-        )
-    except requests.RequestException as error:
-        fail(
-            f"could not reach {url} ({type(error).__name__}). "
-            "Check AI_BASE_URL and your network."
-        )
+    for attempt in range(1, 4):
+        try:
+            response = requests.post(
+                url,
+                headers={"Authorization": f"Bearer {AI_API_KEY}"},
+                json={"model": AI_MODEL, "messages": messages},
+                timeout=AI_TIMEOUT,
+            )
+        except requests.RequestException as error:
+            problem = f"could not reach {url} ({type(error).__name__})"
+        else:
+            if response.status_code != 429 and response.status_code < 500:
+                break
+            problem = f"the AI provider answered {response.status_code}"
+        time.sleep(10 * attempt)
+    else:
+        raise AiError(f"{problem}. Check AI_BASE_URL and your network, and try again.")
     try:
         body = response.json()
     except ValueError:
         body = None
     if response.status_code in (401, 403):
-        fail(
+        raise AiError(
             f"the AI provider refused AI_API_KEY ({response.status_code} "
             f"{error_detail(body)})."
         )
     if response.status_code >= 400:
         reason = error_detail(body) or response.reason
-        check = (
-            " Check AI_BASE_URL and AI_MODEL."
-            if response.status_code in (400, 404)
-            else ""
+        raise AiError(
+            f"the AI provider answered {response.status_code} ({reason}). "
+            "Check AI_BASE_URL and AI_MODEL."
         )
-        fail(f"the AI provider answered {response.status_code} ({reason}).{check}")
     try:
         choice = body["choices"][0]
         text = choice["message"]["content"]
     except (TypeError, KeyError, IndexError):
-        fail(f"{url} didn't send a chat reply. Check AI_BASE_URL.")
+        raise AiError(f"{url} didn't send a chat reply. Check AI_BASE_URL.") from None
     if choice.get("finish_reason") == "length":
-        fail("the AI model's reply was cut off. Try another AI_MODEL.")
+        raise AiError("the AI model's reply was cut off. Try another AI_MODEL.")
     return text or ""
 
 
@@ -505,7 +520,11 @@ def pick_moments(lines, duration):
                 "with these fixed, as JSON only.",
             },
         ]
-        retried = check_reply(ask_ai(messages), lines, duration)
+        try:
+            retried = check_reply(ask_ai(messages), lines, duration)
+        except AiError as error:
+            print(f"The second request failed, so the first answer is kept ({error})")
+            retried = [], problems
         if len(retried[0]) > len(moments):  # keep the first answer if it was better
             moments, problems = retried
     return moments, problems
@@ -544,21 +563,14 @@ def read_moments(path, duration):
 
 
 def get_moments(lines, manifest, folder, repick):
-    """Reuse moments.json while nothing that shapes the pick has changed;
-    otherwise pick again.
+    """Use moments.json if it exists, and ask the AI model for moments if it doesn't
+    or if `repick` is set.
 
     moments.json is the contract between the picker and the renders: a list of
     {"start", "end", "title"} with times in seconds. Edit it by hand, or write it
     with a different picker, and the renders use it as it is."""
     path = folder / "moments.json"
-    picked_with = hashlib.sha256(
-        json.dumps([transcript_text(lines), AI_BASE_URL, AI_MODEL, PROMPT]).encode()
-    ).hexdigest()[:16]
-    if (
-        path.exists()
-        and not repick
-        and manifest.get("picked_with") in (None, picked_with)
-    ):
+    if path.exists() and not repick:
         print(f"Using the moments in {path}")
         return read_moments(path, manifest["duration"])
 
@@ -568,7 +580,10 @@ def get_moments(lines, manifest, folder, repick):
             "moments. The README gives the values for common providers."
         )
     print(f"Asking {AI_MODEL} for {CLIP_COUNT} moments from {len(lines)} sentences")
-    moments, problems = pick_moments(lines, manifest["duration"])
+    try:
+        moments, problems = pick_moments(lines, manifest["duration"])
+    except AiError as error:
+        fail(str(error))
     for problem in problems:
         print(f"  left out: {problem}")
     if not moments:
@@ -577,8 +592,6 @@ def get_moments(lines, manifest, folder, repick):
             f"or write {path} by hand."
         )
     path.write_text(json.dumps(moments, indent=2))
-    manifest["picked_with"] = picked_with
-    manifest.save()
     for n, moment in enumerate(moments, 1):
         span = f"{clock(moment['start'])} to {clock(moment['end'])}"
         print(f"  {n}. {moment['title']} ({span})")
@@ -722,7 +735,7 @@ def finished(render, label):
     return render["status"] == "done"
 
 
-def advance(job, moment, source_url, cues, path, label):
+def advance(job, moment, manifest, cues, path, label):
     """Take one clip a step further: upload its captions and render it, then
     download it."""
     if "render" not in job:
@@ -731,7 +744,13 @@ def advance(job, moment, source_url, cues, path, label):
             if not srt:
                 fail(f"{label} has no words in the transcript. Edit moments.json.")
             job["captions"] = upload_text(srt)
-        job["render"] = submit(clip_edit(source_url, moment, job["captions"]), label)
+        # Saved before the request is sent. If the run stops during the request,
+        # the next run can't tell whether the render started, so it won't resend it.
+        job["submitting"] = True
+        manifest.save()
+        edit = clip_edit(manifest["source_url"], moment, job["captions"])
+        job["render"] = submit(edit, label)
+        del job["submitting"]
         return
     if not finished(job["render"], label):
         return
@@ -768,7 +787,13 @@ def render_clips(moments, cues, manifest, folder):
     jobs = manifest.setdefault("renders", {})
     todo = []
     for n, moment in enumerate(moments, 1):
-        job = jobs.setdefault(f"{moment['start']:.3f}-{moment['end']:.3f}", {})
+        # The title is part of the key, so a clip whose title changes is made again
+        key = f"{moment['start']:.3f}-{moment['end']:.3f} {moment['title']}"
+        job = jobs.setdefault(key, {})
+        if job.pop("submitting", None):
+            job["unresolved"] = "the last run stopped while it was sending the request"
+        if "file" in job and not Path(job["file"]).exists():
+            del job["file"]  # deleted since, so it's downloaded again
         if clip_state(job) == "failed":  # a new run tries failed clips again
             job.pop("error", None)
             if job.get("render", {}).get("status") == "failed":
@@ -784,12 +809,14 @@ def render_clips(moments, cues, manifest, folder):
             if clip_state(job) != "working":
                 continue
             try:
-                advance(job, moment, manifest["source_url"], cues, path, f"clip {n}")
+                advance(job, moment, manifest, cues, path, f"clip {n}")
             except Unresolved as error:
                 # Don't resubmit: the render may have started, and a retry could
                 # duplicate it.
+                job.pop("submitting", None)
                 job["unresolved"] = f"the submit request didn't complete ({error})"
             except (ApiError, requests.RequestException) as error:
+                job.pop("submitting", None)  # refused, so no render started
                 job["error"] = str(error)
             manifest.save()
         if all(clip_state(job) != "working" for _, _, job, _ in todo):

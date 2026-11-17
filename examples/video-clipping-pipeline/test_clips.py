@@ -93,11 +93,29 @@ class Resume(unittest.TestCase):
         self.downloads.append(url)
         Path(path).write_bytes(b"video")
 
-    def run_clips(self):
+    def run_clips(self, moment=MOMENT):
         """One run of the render step, from the manifest on disk. Returns the job."""
         manifest = clips.Manifest(self.folder / "manifest.json", RECORDING)
-        todo = quietly(clips.render_clips, [MOMENT], CUES, manifest, self.folder)
+        todo = quietly(clips.render_clips, [moment], CUES, manifest, self.folder)
         return todo[0][2]
+
+    def test_a_run_stopped_during_the_submit_does_not_send_it_again(self):
+        self.edit.post_errors = [KeyboardInterrupt()]
+        with self.assertRaises(KeyboardInterrupt):
+            self.run_clips()
+        self.assertEqual(clips.clip_state(self.run_clips()), "unresolved")
+        self.assertEqual(self.edit.submits, [])
+
+    def test_a_new_title_makes_the_clip_again(self):
+        self.run_clips()
+        self.run_clips(dict(MOMENT, title="A better title"))
+        self.assertEqual(len(self.edit.submits), 2)
+
+    def test_a_deleted_clip_file_is_downloaded_again(self):
+        Path(self.run_clips()["file"]).unlink()
+        self.assertEqual(clips.clip_state(self.run_clips()), "done")
+        self.assertEqual(len(self.edit.submits), 1)
+        self.assertEqual(len(self.downloads), 2)
 
     def test_a_clip_takes_one_upload_one_render_and_one_download(self):
         job = self.run_clips()
@@ -201,32 +219,68 @@ class ReadReply(unittest.TestCase):
         self.assertIsNone(clips.read_reply(reply))
 
 
+def chat_response(status_code, body):
+    response = requests.Response()
+    response.status_code = status_code
+    response._content = json.dumps(body).encode()
+    return response
+
+
+def chat_reply(text):
+    return chat_response(
+        200, {"choices": [{"message": {"content": text}, "finish_reason": "stop"}]}
+    )
+
+
 class AskAi(unittest.TestCase):
-    def ask(self, status_code, body):
-        response = requests.Response()
-        response.status_code = status_code
-        response._content = json.dumps(body).encode()
-        with mock.patch.object(clips.requests, "post", return_value=response) as post:
+    def setUp(self):
+        sleep = mock.patch.object(clips.time, "sleep")
+        sleep.start()
+        self.addCleanup(sleep.stop)
+
+    def ask(self, *responses):
+        """Ask once, with the AI provider sending these responses in turn. Returns
+        the reply text, or the AiError message, and the mocked post."""
+        with mock.patch.object(clips.requests, "post", side_effect=responses) as post:
             try:
-                return quietly(clips.ask_ai, [{"role": "user", "content": "hi"}]), post
-            except SystemExit as stop:
-                return str(stop), post
+                return clips.ask_ai([{"role": "user", "content": "hi"}]), post
+            except clips.AiError as error:
+                return str(error), post
 
     def test_the_reply_text_is_returned(self):
-        body = {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
-        text, post = self.ask(200, body)
+        text, post = self.ask(chat_reply("{}"))
         self.assertEqual(text, "{}")
         self.assertTrue(post.call_args.args[0].endswith("/chat/completions"))
 
-    def test_a_refused_key_stops_with_one_line(self):
-        message, _ = self.ask(401, {"error": {"message": "Incorrect API key"}})
+    def test_a_rate_limit_is_tried_again(self):
+        limited = chat_response(429, {"error": {"message": "Rate limit"}})
+        text, post = self.ask(limited, chat_reply("{}"))
+        self.assertEqual(text, "{}")
+        self.assertEqual(post.call_count, 2)
+
+    def test_a_refused_key_names_the_setting(self):
+        message, _ = self.ask(
+            chat_response(401, {"error": {"message": "Incorrect API key"}})
+        )
         self.assertIn("refused AI_API_KEY", message)
         self.assertIn("Incorrect API key", message)
 
-    def test_a_reply_that_was_cut_off_stops(self):
+    def test_a_reply_that_was_cut_off_is_an_error(self):
         body = {"choices": [{"message": {"content": "{"}, "finish_reason": "length"}]}
-        message, _ = self.ask(200, body)
+        message, _ = self.ask(chat_response(200, body))
         self.assertIn("cut off", message)
+
+
+class PickMoments(unittest.TestCase):
+    LINES = [clips.Cue(0, 10, "One two three four."), clips.Cue(10, 30, "Five six.")]
+    PICK = {"first_words": "one two", "last_words": "five six", "title": "T"}
+
+    def test_a_failed_second_request_keeps_the_first_answer(self):
+        first = json.dumps({"moments": [self.PICK]})
+        error = clips.AiError("the AI provider answered 503")
+        with mock.patch.object(clips, "ask_ai", side_effect=[first, error]):
+            moments, _ = quietly(clips.pick_moments, self.LINES, 100)
+        self.assertEqual(moments, [{"start": 0, "end": 30, "title": "T"}])
 
 
 class CheckPicks(unittest.TestCase):
@@ -308,6 +362,10 @@ class PostJson(unittest.TestCase):
         with mock.patch.object(clips, "post_json", return_value={"response": {}}):
             with self.assertRaises(clips.Unresolved):
                 quietly(clips.submit, {}, "clip 1")
+
+    def test_an_accepted_request_with_an_unreadable_reply_is_not_sent_again(self):
+        with self.assertRaises(clips.Unresolved):
+            self.post(201, b"<html>gateway</html>")
 
 
 if __name__ == "__main__":
