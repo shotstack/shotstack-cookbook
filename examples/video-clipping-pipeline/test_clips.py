@@ -5,6 +5,7 @@ Run them from this directory: python3 -m unittest
 
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -110,14 +111,24 @@ class Resume(unittest.TestCase):
         self.assertEqual(clips.clip_state(self.run_clips()), "done")
         self.assertEqual(len(self.edit.submits), 2)
 
-    def test_a_deleted_file_asks_for_the_entry_to_be_deleted(self):
-        self.download_errors = [http_error(404), http_error(404)]
-        job = self.run_clips()
-        self.assertEqual(clips.clip_state(job), "failed")
-        self.assertIn("manifest.json", job["fix"])
-        job = self.run_clips()
-        self.assertIn("fix", job)
-        self.assertEqual(len(self.edit.submits), 2)
+    def test_a_deleted_file_renders_the_captions_again(self):
+        self.download_errors = [http_error(404)]
+        self.assertEqual(clips.clip_state(self.run_clips()), "failed")
+        self.assertEqual(clips.clip_state(self.run_clips()), "done")
+        # cut, captions, captions again: the cut is new enough to use again
+        self.assertEqual(len(self.edit.submits), 3)
+        self.assertIn("fonts", self.edit.submits[2]["timeline"])
+
+    def test_an_old_cut_is_rendered_again_before_its_captions(self):
+        self.download_errors = [http_error(404)]
+        self.run_clips()
+        manifest = clips.Manifest(self.folder / "manifest.json", RECORDING)
+        for job in manifest["renders"].values():
+            job["cut"]["submitted"] -= clips.CUT_MAX_AGE + 1
+        manifest.save()
+        self.assertEqual(clips.clip_state(self.run_clips()), "done")
+        self.assertEqual(len(self.edit.submits), 4)
+        self.assertNotIn("fonts", self.edit.submits[2]["timeline"])
 
     def test_a_failed_captions_render_redoes_only_the_captions(self):
         self.edit.failed = {"render-2"}
@@ -127,6 +138,55 @@ class Resume(unittest.TestCase):
         # The third render is the captions again (it loads the font), not a new cut
         self.assertEqual(len(self.edit.submits), 3)
         self.assertIn("fonts", self.edit.submits[2]["timeline"])
+
+
+class CheckPicks(unittest.TestCase):
+    """How Claude's quotes become start and end times."""
+
+    def test_a_repeated_phrase_uses_the_shortest_span(self):
+        lines = [
+            clips.Cue(0, 10, "So the next thing is setup."),
+            clips.Cue(10, 300, "Then a long part."),
+            clips.Cue(300, 310, "So the next thing is testing."),
+            clips.Cue(310, 330, "And that is why tests matter."),
+        ]
+        pick = {
+            "first_words": "So the next thing is",
+            "last_words": "why tests matter",
+            "title": "Tests",
+        }
+        moments, _ = clips.check_picks([pick], lines, 400)
+        self.assertEqual(moments, [{"start": 300, "end": 330, "title": "Tests"}])
+
+    def test_accented_words_match(self):
+        lines = [clips.Cue(0, 20, "Über die Prüfung."), clips.Cue(20, 40, "Schön.")]
+        pick = {"first_words": "über die", "last_words": "schön", "title": "Prüfung"}
+        moments, _ = clips.check_picks([pick], lines, 100)
+        self.assertEqual(len(moments), 1)
+
+
+class ReadMoments(unittest.TestCase):
+    """A moments.json written by hand."""
+
+    def read(self, moments):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "moments.json"
+            path.write_text(json.dumps(moments))
+            with contextlib.redirect_stderr(io.StringIO()):
+                return clips.read_moments(path, 3600)
+
+    def test_overlapping_moments_are_refused(self):
+        with self.assertRaises(SystemExit):
+            self.read(
+                [
+                    {"start": 10, "end": 40, "title": "a"},
+                    {"start": 30, "end": 60, "title": "b"},
+                ]
+            )
+
+    def test_an_empty_list_is_refused(self):
+        with self.assertRaises(SystemExit):
+            self.read([])
 
 
 class PostJson(unittest.TestCase):

@@ -46,6 +46,9 @@ MIN_SECONDS, MAX_SECONDS = 15, 60
 POLL_SECONDS = 10
 IMPORT_TIMEOUT = 60 * 60  # stop waiting for the import and transcript after an hour
 RENDER_TIMEOUT = 60 * 60  # and for the renders
+# A render's URL can be deleted after 24 hours. A cut older than this is rendered
+# again before its captions are.
+CUT_MAX_AGE = 20 * 60 * 60
 
 
 def fail(message):
@@ -323,31 +326,25 @@ def sentences(cues):
 
 def transcript_text(lines):
     """The transcript for the prompt: one sentence per line, with its start time."""
-    return "\n".join(
-        f"[{int(line.start // 60)}:{int(line.start % 60):02d}] {line.text}"
-        for line in lines
-    )
+    return "\n".join(f"[{clock(line.start)}] {line.text}" for line in lines)
 
 
 def words(text):
     """Lowercase words without punctuation, so a quote matches however it's
     punctuated."""
-    return re.findall(r"[a-z0-9]+", text.lower().replace("'", "").replace("’", ""))
+    return re.findall(r"[^\W_]+", text.lower().replace("'", "").replace("’", ""))
 
 
-def locate(quote, lines, after=0):
-    """Find a quote in the transcript, from line `after` on. Returns the indexes of
-    the lines where it starts and ends, or None if it isn't there."""
-    target = words(quote)
-    stream = [(word, i) for i, line in enumerate(lines) for word in words(line.text)]
+def find(target, stream, after=0):
+    """Yield (first line, last line) for each place the words in `target` occur in
+    the transcript's (word, line) stream, from line `after` on."""
     for k in range(len(stream) - len(target) + 1):
         if (
             target
             and stream[k][1] >= after
             and [w for w, _ in stream[k : k + len(target)]] == target
         ):
-            return stream[k][1], stream[k + len(target) - 1][1]
-    return None
+            yield stream[k][1], stream[k + len(target) - 1][1]
 
 
 def ask_claude(client, messages):
@@ -366,7 +363,9 @@ def ask_claude(client, messages):
             f"Claude stopped early ({response.stop_reason}), "
             "so its reply isn't complete."
         )
-    text = next(block.text for block in response.content if block.type == "text")
+    text = next((b.text for b in response.content if b.type == "text"), None)
+    if text is None:
+        fail("Claude's reply has no text.")
     return json.loads(text)["moments"]
 
 
@@ -374,27 +373,32 @@ def check_picks(picks, lines, duration):
     """Find each moment's quotes in the transcript, turn them into start and end
     times, and check the rules. Returns the moments that pass, best first, and a
     list of problems."""
+    stream = [(word, i) for i, line in enumerate(lines) for word in words(line.text)]
     moments, problems = [], []
     if len(picks) < CLIP_COUNT:
         problems.append(f"there are {len(picks)} moments, not {CLIP_COUNT}")
     for n, pick in enumerate(picks, 1):
         where = f'moment {n} ("{pick["title"]}")'
-        found = locate(pick["first_words"], lines)
-        if not found:
+        starts = [first for first, _ in find(words(pick["first_words"]), stream)]
+        if not starts:
             problems.append(
                 f'{where}: the transcript doesn\'t contain "{pick["first_words"]}"'
             )
             continue
-        first = found[0]
-        found = locate(pick["last_words"], lines, after=first)
-        if not found:
+        # The first words can occur more than once. Pair each place with the next
+        # place the last words occur, and keep the shortest span.
+        spans = []
+        for first in starts:
+            found = next(find(words(pick["last_words"]), stream, after=first), None)
+            if found:
+                spans.append((lines[first].start, lines[found[1]].end))
+        if not spans:
             problems.append(
                 f'{where}: the transcript doesn\'t contain "{pick["last_words"]}" '
                 "after its first words"
             )
             continue
-        last = found[1]
-        start, end = lines[first].start, lines[last].end
+        start, end = min(spans, key=lambda span: span[1] - span[0])
         if not MIN_SECONDS <= end - start <= MAX_SECONDS:
             problems.append(
                 f"{where}: lasts {end - start:.1f} seconds, "
@@ -431,29 +435,40 @@ def pick_moments(client, lines, duration):
                 "with these fixed.",
             },
         ]
-        picks = ask_claude(client, messages)
-        moments, problems = check_picks(picks, lines, duration)
+        retried = check_picks(ask_claude(client, messages), lines, duration)
+        if len(retried[0]) > len(moments):  # keep the first answer if it was better
+            moments, problems = retried
     return moments, problems
 
 
 def read_moments(path, duration):
-    """Read moments.json and check that every moment fits the recording."""
+    """Read moments.json and check that the moments fit the recording and don't
+    overlap."""
     try:
         moments = json.loads(path.read_text())
     except ValueError:
         moments = None
     number = (int, float)
-    if not isinstance(moments, list) or not all(
-        isinstance(m, dict)
-        and isinstance(m.get("title"), str)
-        and isinstance(m.get("start"), number)
-        and isinstance(m.get("end"), number)
-        and 0 <= m["start"] < m["end"] <= duration
-        for m in moments
-    ):
+    valid = (
+        isinstance(moments, list)
+        and len(moments) > 0
+        and all(
+            isinstance(m, dict)
+            and isinstance(m.get("title"), str)
+            and isinstance(m.get("start"), number)
+            and isinstance(m.get("end"), number)
+            and 0 <= m["start"] < m["end"] <= duration
+            for m in moments
+        )
+    )
+    if valid:
+        spans = sorted((m["start"], m["end"]) for m in moments)
+        valid = all(a[1] <= b[0] for a, b in zip(spans, spans[1:]))
+    if not valid:
         fail(
-            f"{path} must be a list of moments, each with a title and a start and end "
-            "in seconds inside the recording. Fix it, or delete it to pick again."
+            f"{path} must be a list of moments that don't overlap, each with a title "
+            "and a start and end in seconds inside the recording. Fix it, or delete "
+            "it to pick again."
         )
     return moments
 
@@ -505,17 +520,17 @@ def get_moments(lines, manifest, folder, repick):
         fail(f"the Claude API returned an error: {error}")
     for problem in problems:
         print(f"  left out: {problem}")
+    if not moments:
+        fail(
+            "none of the moments passed the checks. Run again to ask Claude again, "
+            f"or write {path} by hand."
+        )
     path.write_text(json.dumps(moments, indent=2))
     manifest["picked_with"] = picked_with
     manifest.save()
     for n, moment in enumerate(moments, 1):
         span = f"{clock(moment['start'])} to {clock(moment['end'])}"
         print(f"  {n}. {moment['title']} ({span})")
-    if not moments:
-        fail(
-            "none of the moments passed the checks. "
-            f"Change the prompt, or write {path} by hand."
-        )
     if len(moments) < CLIP_COUNT:
         print(
             f"Only {len(moments)} moments passed the checks. Run with --repick to try "
@@ -554,9 +569,9 @@ def cut_edit(source_url, moment):
     }
 
 
-# Roboto, loaded so the bold weights below apply. A loaded font can be referred
-# to by its name or by its file name, and this uses the file name. Copy font URLs
-# verbatim from Google Fonts: the version and file name change over time.
+# Roboto, a variable font, loaded so the bold weights below apply. A loaded font
+# can be referred to by its name or by its file name, and this uses the file name.
+# Copy font URLs verbatim from Google Fonts: the version and file name change.
 ROBOTO_URL = "https://fonts.gstatic.com/s/roboto/v50/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf"
 ROBOTO = "KFOmCnqEu92Fr1Me5WZLCzYlKw"
 
@@ -684,11 +699,8 @@ def advance(job, moment, source_url, path, label):
     except requests.HTTPError as error:
         status = getattr(error.response, "status_code", None)
         if status in (403, 404, 410):
+            del job["captions"]  # so the next run renders the captions again
             job["error"] = f"the rendered file is gone (HTTP {status})"
-            job["fix"] = (
-                'Delete this clip\'s entry under "renders" in manifest.json '
-                "and run again to render it again."
-            )
             return
         raise
     job["file"] = str(path)
@@ -721,12 +733,15 @@ def render_clips(moments, manifest, folder):
         job = jobs.setdefault(f"{moment['start']:.3f}-{moment['end']:.3f}", {})
         if clip_state(job) == "failed":  # a new run tries failed clips again
             job.pop("error", None)
-            job.pop("fix", None)
-            if job.get("cut", {}).get("status") == "failed":
-                job.pop("cut")
+            cut = job.get("cut", {})
+            redo_captions = job.get("captions", {}).get("status") in (None, "failed")
+            # The captions render reads the cut's URL, so an old cut is made again
+            cut_is_old = time.time() - cut.get("submitted", 0) > CUT_MAX_AGE
+            if cut.get("status") == "failed" or (redo_captions and cut_is_old):
+                job.pop("cut", None)
                 job.pop("captions", None)
-            if job.get("captions", {}).get("status") == "failed":
-                job.pop("captions")
+            elif redo_captions:
+                job.pop("captions", None)
         minutes, seconds = divmod(int(moment["start"]), 60)
         todo.append((n, moment, job, folder / f"clip-{minutes:02d}m{seconds:02d}s.mp4"))
     manifest.save()
@@ -775,8 +790,10 @@ def report(todo):
                 job.get(stage, {}).get("error") for stage in ("cut", "captions")
             ]
             reason = "; ".join(r for r in reasons if r)
-            fix = job.get("fix", "Run the same command again to retry it.")
-            print(f"  {n}. {moment['title']} ({where}): failed ({reason}). {fix}")
+            print(
+                f"  {n}. {moment['title']} ({where}): failed ({reason}). "
+                "Run the same command again to retry it."
+            )
 
 
 def main():
@@ -825,8 +842,9 @@ def main():
         todo = render_clips(moments[: args.limit], manifest, folder)
     except Unresolved as error:
         fail(
-            f"a request didn't complete ({error}). It may still have reached "
-            "Shotstack, so check your dashboard before running this again."
+            f"a request didn't complete ({error}). Check your network. The request "
+            "may still have reached Shotstack, so look in your dashboard before you "
+            "run this again."
         )
     except ApiError as error:
         fail(str(error))
