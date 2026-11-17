@@ -903,6 +903,8 @@ def main():
     except ApiError as error:
         fail(str(error))
     report(todo)
+    if any(clip_state(job) != "done" for _, _, job, _ in todo):
+        sys.exit(1)  # so a script or a scheduler can tell that a clip is missing
 
 
 if __name__ == "__main__":
