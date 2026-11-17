@@ -271,13 +271,11 @@ def import_recording(url, manifest, folder):
         )
     srt = requests.get(transcript["url"], timeout=60)
     srt.raise_for_status()
-    (folder / "transcript.srt").write_text(
-        srt.content.decode("utf-8"), encoding="utf-8"
-    )
+    path = folder / "transcript.srt"
+    path.write_text(srt.content.decode("utf-8"), encoding="utf-8")
     manifest.update(source_url=source["source"], duration=source["duration"])
     manifest.save()
-    saved = folder / "transcript.srt"
-    print(f"Imported {clock(source['duration'])} of video and saved {saved}")
+    print(f"Imported {clock(source['duration'])} of video and saved {path}")
 
 
 Cue = namedtuple("Cue", "start end text")
