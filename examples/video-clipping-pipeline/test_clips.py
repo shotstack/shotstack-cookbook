@@ -123,9 +123,6 @@ class Resume(unittest.TestCase):
         self.assertEqual(len(self.uploads), 1)
         self.assertEqual(len(self.edit.submits), 1)
         self.assertEqual(len(self.downloads), 1)
-
-    def test_the_render_uses_the_uploaded_captions(self):
-        self.run_clips()
         tracks = self.edit.submits[0]["timeline"]["tracks"]
         captions = tracks[1]["clips"][0]["asset"]
         self.assertEqual(captions["type"], "rich-caption")
@@ -240,11 +237,11 @@ class AskAi(unittest.TestCase):
 
     def ask(self, *responses):
         """Ask once, with the AI provider sending these responses in turn. Returns
-        the reply text, or the AiError message, and the mocked post."""
+        the reply text, or the ApiError message, and the mocked post."""
         with mock.patch.object(clips.requests, "post", side_effect=responses) as post:
             try:
                 return clips.ask_ai([{"role": "user", "content": "hi"}]), post
-            except clips.AiError as error:
+            except clips.ApiError as error:
                 return str(error), post
 
     def test_the_reply_text_is_returned(self):
@@ -277,7 +274,7 @@ class PickMoments(unittest.TestCase):
 
     def test_a_failed_second_request_keeps_the_first_answer(self):
         first = json.dumps({"moments": [self.PICK]})
-        error = clips.AiError("the AI provider answered 503")
+        error = clips.ApiError("the AI provider answered 503")
         with mock.patch.object(clips, "ask_ai", side_effect=[first, error]):
             moments, _ = quietly(clips.pick_moments, self.LINES, 100)
         self.assertEqual(moments, [{"start": 0, "end": 30, "title": "T"}])

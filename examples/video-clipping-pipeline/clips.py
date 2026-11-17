@@ -98,7 +98,7 @@ class Manifest(dict):
 
 
 class ApiError(Exception):
-    """Shotstack answered with an error."""
+    """Shotstack or the AI provider answered with an error."""
 
 
 class Unresolved(Exception):
@@ -369,10 +369,6 @@ def find(target, stream, after=0):
             yield stream[k][1], stream[k + len(target) - 1][1]
 
 
-class AiError(Exception):
-    """The AI provider couldn't be reached, or answered with an error."""
-
-
 def ask_ai(messages):
     """One request to the AI model through the OpenAI-compatible chat API, which
     OpenAI, Anthropic, Google Gemini and many other providers offer. Returns the
@@ -395,19 +391,19 @@ def ask_ai(messages):
             problem = f"the AI provider answered {response.status_code}"
         time.sleep(10 * attempt)
     else:
-        raise AiError(f"{problem}. Check AI_BASE_URL and your network, and try again.")
+        raise ApiError(f"{problem}. Check AI_BASE_URL and your network, and try again.")
     try:
         body = response.json()
     except ValueError:
         body = None
     if response.status_code in (401, 403):
-        raise AiError(
+        raise ApiError(
             f"the AI provider refused AI_API_KEY ({response.status_code} "
             f"{error_detail(body)})."
         )
     if response.status_code >= 400:
         reason = error_detail(body) or response.reason
-        raise AiError(
+        raise ApiError(
             f"the AI provider answered {response.status_code} ({reason}). "
             "Check AI_BASE_URL and AI_MODEL."
         )
@@ -415,9 +411,9 @@ def ask_ai(messages):
         choice = body["choices"][0]
         text = choice["message"]["content"]
     except (TypeError, KeyError, IndexError):
-        raise AiError(f"{url} didn't send a chat reply. Check AI_BASE_URL.") from None
+        raise ApiError(f"{url} didn't send a chat reply. Check AI_BASE_URL.") from None
     if choice.get("finish_reason") == "length":
-        raise AiError("the AI model's reply was cut off. Try another AI_MODEL.")
+        raise ApiError("the AI model's reply was cut off. Try another AI_MODEL.")
     return text or ""
 
 
@@ -520,7 +516,7 @@ def pick_moments(lines, duration):
         ]
         try:
             retried = check_reply(ask_ai(messages), lines, duration)
-        except AiError as error:
+        except ApiError as error:
             print(f"The second request failed, so the first answer is kept ({error})")
             retried = [], problems
         if len(retried[0]) > len(moments):  # keep the first answer if it was better
@@ -578,10 +574,7 @@ def get_moments(lines, manifest, folder, repick):
             "moments. The README gives the values for common providers."
         )
     print(f"Asking {AI_MODEL} for {CLIP_COUNT} moments from {len(lines)} sentences")
-    try:
-        moments, problems = pick_moments(lines, manifest["duration"])
-    except AiError as error:
-        fail(str(error))
+    moments, problems = pick_moments(lines, manifest["duration"])
     for problem in problems:
         print(f"  left out: {problem}")
     if not moments:
@@ -748,7 +741,6 @@ def advance(job, moment, manifest, cues, path, label):
         manifest.save()
         edit = clip_edit(manifest["source_url"], moment, job["captions"])
         job["render"] = submit(edit, label)
-        del job["submitting"]
         return
     if not finished(job["render"], label):
         return
@@ -811,11 +803,10 @@ def render_clips(moments, cues, manifest, folder):
             except Unresolved as error:
                 # Don't resubmit: the render may have started, and a retry could
                 # duplicate it.
-                job.pop("submitting", None)
                 job["unresolved"] = f"the submit request didn't complete ({error})"
             except (ApiError, requests.RequestException) as error:
-                job.pop("submitting", None)  # refused, so no render started
                 job["error"] = str(error)
+            job.pop("submitting", None)  # sent, refused or not reached
             manifest.save()
         if all(clip_state(job) != "working" for _, _, job, _ in todo):
             return todo
