@@ -74,7 +74,7 @@ uploads it. One render cuts the moment from the recording, puts it in a
 clip to `clip-MMmSSs.mp4`, named by its start time in the recording.
 
 With the demo recording, which is 52 minutes long, the import takes about 4
-minutes. Each clip takes about 2 minutes, and the clips render at the same time.
+minutes. Each clip takes 1 to 3 minutes, and the clips render at the same time.
 
 The script saves its progress in `manifest.json`. Run the same command again
 to continue after a stop. It does not import the recording or pick the
