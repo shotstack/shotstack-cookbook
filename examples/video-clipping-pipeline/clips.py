@@ -172,7 +172,7 @@ def get_json(url):
 
 def upload_text(text):
     """Upload a small text file with the Ingest API and return its URL. An upload
-    doesn't cost anything, so a failed one is sent again on the next run."""
+    can't start a render, so a failed one is safe to send again on the next run."""
     try:
         data = post_json(f"{INGEST}/upload", {}).get("data")
     except Unresolved as error:
@@ -392,10 +392,12 @@ def ask_ai(messages):
         )
     if response.status_code >= 400:
         reason = error_detail(body) or response.reason
-        fail(
-            f"the AI provider answered {response.status_code} ({reason}). "
-            "Check AI_BASE_URL and AI_MODEL."
+        check = (
+            " Check AI_BASE_URL and AI_MODEL."
+            if response.status_code in (400, 404)
+            else ""
         )
+        fail(f"the AI provider answered {response.status_code} ({reason}).{check}")
     try:
         choice = body["choices"][0]
         text = choice["message"]["content"]
@@ -734,8 +736,6 @@ def advance(job, moment, source_url, cues, path, label):
     if not finished(job["render"], label):
         return
     try:
-        # Render URLs can be deleted after 24 hours, so each clip is downloaded as
-        # soon as it's done.
         download(job["render"]["url"], path)
     except requests.HTTPError as error:
         status = getattr(error.response, "status_code", None)
