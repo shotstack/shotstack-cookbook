@@ -34,11 +34,11 @@ cp .env.example .env
 Set `SHOTSTACK_API_KEY` in `.env`. Then set `AI_BASE_URL`, `AI_API_KEY` and
 `AI_MODEL` for your AI provider:
 
-| Provider      | `AI_BASE_URL`                                             | `AI_MODEL`, for example | API key                                                           |
-| ------------- | --------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------- |
-| OpenAI        | `https://api.openai.com/v1`                               | `gpt-5.4-mini`          | [platform.openai.com](https://platform.openai.com/api-keys)       |
-| Anthropic     | `https://api.anthropic.com/v1`                            | `claude-sonnet-5-5`     | [platform.claude.com](https://platform.claude.com/settings/keys)  |
-| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.5-flash`      | [aistudio.google.com](https://aistudio.google.com/apikey)         |
+| Provider      | `AI_BASE_URL`                                             | `AI_MODEL`, for example | API key                                                          |
+| ------------- | --------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------- |
+| OpenAI        | `https://api.openai.com/v1`                               | `gpt-5.4-mini`          | [platform.openai.com](https://platform.openai.com/api-keys)      |
+| Anthropic     | `https://api.anthropic.com/v1`                            | `claude-sonnet-5-5`     | [platform.claude.com](https://platform.claude.com/settings/keys) |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.5-flash`      | [aistudio.google.com](https://aistudio.google.com/apikey)        |
 
 Load the file. Do this in each new terminal, and each time you change `.env`:
 
