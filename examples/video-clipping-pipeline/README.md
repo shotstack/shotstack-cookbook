@@ -65,6 +65,9 @@ Each clip uses two renders. The first render cuts the moment and puts it in a
 of the cut. The script downloads each clip to `clip-MMmSSs.mp4`, named by its
 start time in the recording.
 
+With the demo recording, which is 52 minutes long, the import takes about 4
+minutes. Each clip takes 2 to 4 minutes, and the clips render at the same time.
+
 The script saves its progress in `manifest.json`. Run the same command again
 to continue after a stop. It does not import the recording or pick the
 moments again. To pick new moments, add `--repick`. To choose the moments
