@@ -1,4 +1,4 @@
-"""Tests for the resume logic of clips.py. They do not call Shotstack or Claude.
+"""Tests for clips.py. They do not call Shotstack or an AI provider.
 
 Run them from this directory: python3 -m unittest
 """
@@ -17,6 +17,7 @@ import clips
 
 RECORDING = "https://example.com/talk.mp4"
 MOMENT = {"start": 61.0, "end": 91.0, "title": "A moment"}
+CUES = [clips.Cue(61.0, 70.0, "First words here."), clips.Cue(70.0, 91.0, "The end.")]
 URL = "https://cdn.shotstack.io/au/stage/owner/render.mp4"
 
 
@@ -24,6 +25,12 @@ def http_error(status_code):
     response = requests.Response()
     response.status_code = status_code
     return requests.HTTPError(f"{status_code} for {URL}", response=response)
+
+
+def quietly(function, *args):
+    with contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stderr(io.StringIO()):
+            return function(*args)
 
 
 class FakeEdit:
@@ -59,11 +66,13 @@ class Resume(unittest.TestCase):
         manifest.update(source_url=RECORDING, duration=3600)
         manifest.save()
         self.edit = FakeEdit()
+        self.uploads = []
         self.downloads = []
         self.download_errors = []
         replacements = {
             "post_json": self.edit.post_json,
             "get_json": self.edit.get_json,
+            "upload_text": self.upload_text,
             "download": self.download,
         }
         for name, value in replacements.items():
@@ -74,6 +83,10 @@ class Resume(unittest.TestCase):
         sleep.start()
         self.addCleanup(sleep.stop)
 
+    def upload_text(self, text):
+        self.uploads.append(text)
+        return "https://example.com/captions.srt"
+
     def download(self, url, path):
         if self.download_errors:
             raise self.download_errors.pop(0)
@@ -83,15 +96,22 @@ class Resume(unittest.TestCase):
     def run_clips(self):
         """One run of the render step, from the manifest on disk. Returns the job."""
         manifest = clips.Manifest(self.folder / "manifest.json", RECORDING)
-        with contextlib.redirect_stdout(io.StringIO()):
-            todo = clips.render_clips([MOMENT], manifest, self.folder)
+        todo = quietly(clips.render_clips, [MOMENT], CUES, manifest, self.folder)
         return todo[0][2]
 
-    def test_a_clip_takes_two_renders_and_one_download(self):
+    def test_a_clip_takes_one_upload_one_render_and_one_download(self):
         job = self.run_clips()
         self.assertEqual(clips.clip_state(job), "done")
-        self.assertEqual(len(self.edit.submits), 2)
+        self.assertEqual(len(self.uploads), 1)
+        self.assertEqual(len(self.edit.submits), 1)
         self.assertEqual(len(self.downloads), 1)
+
+    def test_the_render_uses_the_uploaded_captions(self):
+        self.run_clips()
+        tracks = self.edit.submits[0]["timeline"]["tracks"]
+        captions = tracks[1]["clips"][0]["asset"]
+        self.assertEqual(captions["type"], "rich-caption")
+        self.assertEqual(captions["src"], "https://example.com/captions.srt")
 
     def test_a_submit_that_did_not_complete_is_not_sent_again(self):
         self.edit.post_errors = [clips.Unresolved("ReadTimeout")]
@@ -103,45 +123,114 @@ class Resume(unittest.TestCase):
         self.edit.post_errors = [clips.ApiError("429 from the Edit API")]
         self.assertEqual(clips.clip_state(self.run_clips()), "failed")
         self.assertEqual(clips.clip_state(self.run_clips()), "done")
-        self.assertEqual(len(self.edit.submits), 2)
+        self.assertEqual(len(self.edit.submits), 1)
+        self.assertEqual(len(self.uploads), 1)  # the captions are kept
 
     def test_a_failed_download_does_not_render_again(self):
         self.download_errors = [requests.ConnectionError("network down")]
         self.assertEqual(clips.clip_state(self.run_clips()), "failed")
         self.assertEqual(clips.clip_state(self.run_clips()), "done")
-        self.assertEqual(len(self.edit.submits), 2)
+        self.assertEqual(len(self.edit.submits), 1)
 
-    def test_a_deleted_file_renders_the_captions_again(self):
+    def test_a_deleted_file_is_rendered_again(self):
         self.download_errors = [http_error(404)]
         self.assertEqual(clips.clip_state(self.run_clips()), "failed")
         self.assertEqual(clips.clip_state(self.run_clips()), "done")
-        # cut, captions, captions again: the cut is new enough to use again
-        self.assertEqual(len(self.edit.submits), 3)
-        self.assertIn("fonts", self.edit.submits[2]["timeline"])
+        self.assertEqual(len(self.edit.submits), 2)
+        self.assertEqual(len(self.uploads), 1)
 
-    def test_an_old_cut_is_rendered_again_before_its_captions(self):
-        self.download_errors = [http_error(404)]
-        self.run_clips()
-        manifest = clips.Manifest(self.folder / "manifest.json", RECORDING)
-        for job in manifest["renders"].values():
-            job["cut"]["submitted"] -= clips.CUT_MAX_AGE + 1
-        manifest.save()
-        self.assertEqual(clips.clip_state(self.run_clips()), "done")
-        self.assertEqual(len(self.edit.submits), 4)
-        self.assertNotIn("fonts", self.edit.submits[2]["timeline"])
-
-    def test_a_failed_captions_render_redoes_only_the_captions(self):
-        self.edit.failed = {"render-2"}
+    def test_a_failed_render_is_rendered_again(self):
+        self.edit.failed = {"render-1"}
         self.assertEqual(clips.clip_state(self.run_clips()), "failed")
         self.edit.failed = set()
         self.assertEqual(clips.clip_state(self.run_clips()), "done")
-        # The third render is the captions again (it loads the font), not a new cut
-        self.assertEqual(len(self.edit.submits), 3)
-        self.assertIn("fonts", self.edit.submits[2]["timeline"])
+        self.assertEqual(len(self.edit.submits), 2)
+
+
+class ClipSrt(unittest.TestCase):
+    def test_the_captions_are_timed_from_the_start_of_the_clip(self):
+        cues = [
+            clips.Cue(59.0, 62.0, "Before and in."),
+            clips.Cue(62.0, 70.5, "Inside."),
+            clips.Cue(95.0, 99.0, "After."),
+        ]
+        self.assertEqual(
+            clips.clip_srt(cues, MOMENT),
+            "1\n00:00:00,000 --> 00:00:01,000\nBefore and in.\n\n"
+            "2\n00:00:01,000 --> 00:00:09,500\nInside.\n",
+        )
+
+
+class UploadText(unittest.TestCase):
+    def test_the_file_is_sent_as_text(self):
+        signed = {"data": {"id": "src-1", "attributes": {"url": "https://s3/upload"}}}
+        ready = {"data": {"attributes": {"status": "ready", "source": "https://s3/f"}}}
+        put = mock.Mock()
+        with mock.patch.object(
+            clips, "post_json", return_value=signed
+        ), mock.patch.object(clips, "get_json", return_value=ready), mock.patch.object(
+            clips.requests, "put", put
+        ):
+            self.assertEqual(
+                clips.upload_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n"),
+                "https://s3/f",
+            )
+        self.assertEqual(
+            put.call_args.kwargs["headers"], {"Content-Type": "text/plain"}
+        )
+
+    def test_an_upload_that_did_not_complete_is_tried_again_later(self):
+        error = clips.Unresolved("ConnectionError")
+        with mock.patch.object(clips, "post_json", side_effect=error):
+            with self.assertRaises(clips.ApiError):
+                clips.upload_text("text")
+
+
+class ReadReply(unittest.TestCase):
+    PICK = {"first_words": "a b", "last_words": "c d", "title": "T"}
+
+    def test_json_in_a_code_block_is_read(self):
+        reply = "```json\n" + json.dumps({"moments": [self.PICK]}) + "\n```"
+        self.assertEqual(clips.read_reply(reply), [self.PICK])
+
+    def test_a_reply_that_is_not_json_is_refused(self):
+        self.assertIsNone(clips.read_reply("Here are the best moments: ..."))
+
+    def test_a_moment_without_a_title_is_refused(self):
+        reply = json.dumps({"moments": [{"first_words": "a", "last_words": "b"}]})
+        self.assertIsNone(clips.read_reply(reply))
+
+
+class AskAi(unittest.TestCase):
+    def ask(self, status_code, body):
+        response = requests.Response()
+        response.status_code = status_code
+        response._content = json.dumps(body).encode()
+        with mock.patch.object(clips.requests, "post", return_value=response) as post:
+            try:
+                return quietly(clips.ask_ai, [{"role": "user", "content": "hi"}]), post
+            except SystemExit as stop:
+                return str(stop), post
+
+    def test_the_reply_text_is_returned(self):
+        body = {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+        text, post = self.ask(200, body)
+        self.assertEqual(text, "{}")
+        self.assertTrue(post.call_args.args[0].endswith("/chat/completions"))
+
+    def test_a_refused_key_stops_with_one_line(self):
+        message, _ = self.ask(401, {"error": {"message": "Incorrect API key"}})
+        self.assertIn("refused AI_API_KEY", message)
+        self.assertIn("Incorrect API key", message)
+
+    def test_a_reply_that_was_cut_off_stops(self):
+        body = {"choices": [{"message": {"content": "{"}, "finish_reason": "length"}]}
+        message, _ = self.ask(200, body)
+        self.assertIn("cut off", message)
 
 
 class CheckPicks(unittest.TestCase):
-    """How Claude's quotes become start and end times."""
+    """How the AI model's quotes become start and end times."""
 
     def test_a_repeated_phrase_uses_the_shortest_span(self):
         lines = [
@@ -172,8 +261,7 @@ class ReadMoments(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "moments.json"
             path.write_text(json.dumps(moments))
-            with contextlib.redirect_stderr(io.StringIO()):
-                return clips.read_moments(path, 3600)
+            return quietly(clips.read_moments, path, 3600)
 
     def test_overlapping_moments_are_refused(self):
         with self.assertRaises(SystemExit):
@@ -219,7 +307,7 @@ class PostJson(unittest.TestCase):
     def test_a_reply_with_no_render_id_is_not_sent_again(self):
         with mock.patch.object(clips, "post_json", return_value={"response": {}}):
             with self.assertRaises(clips.Unresolved):
-                clips.submit({}, "clip 1")
+                quietly(clips.submit, {}, "clip 1")
 
 
 if __name__ == "__main__":

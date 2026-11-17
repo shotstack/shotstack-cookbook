@@ -1,9 +1,9 @@
 # Video clipping pipeline
 
 Turn a long recording into five short vertical clips with captions. Shotstack
-imports the recording and makes a transcript. Claude picks the best moments.
-Shotstack cuts each moment and adds a title and captions. You get the MP4
-files in `clips/<name>/`.
+imports the recording and makes a transcript. An AI model picks the best
+moments. Shotstack renders each moment with a title and captions. You get the
+MP4 files in `clips/<name>/`.
 
 Related guide: [Build a video clipping pipeline with the Shotstack API](https://shotstack.io/learn/video-clipping-api-pipeline/).
 
@@ -11,12 +11,12 @@ Related guide: [Build a video clipping pipeline with the Shotstack API](https://
 
 - A [Shotstack account](https://dashboard.shotstack.io/register) and your
   **production** API key
-- An [Anthropic API key](https://platform.claude.com/settings/keys). Claude
-  picks the moments.
-- Python 3.9 or later
+- An API key from an AI provider with an OpenAI-compatible chat API, for
+  example OpenAI, Anthropic or Google Gemini
+- Python 3.8 or later, with `requests` 2.18 or later
 - A public URL that gives the video file, not a web page
 
-Each clip uses two renders. Production renders use credits. Rates are on the
+Each clip uses one render. Production renders use credits. Rates are on the
 [pricing page](https://shotstack.io/pricing/). Set `SHOTSTACK_ENV=stage` in
 `.env` and use your sandbox key for free watermarked test renders.
 
@@ -31,8 +31,16 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `SHOTSTACK_API_KEY` and `ANTHROPIC_API_KEY` in `.env`. Then load the file.
-Do this in each new terminal, and each time you change `.env`:
+Set `SHOTSTACK_API_KEY` in `.env`. Then set `AI_BASE_URL`, `AI_API_KEY` and
+`AI_MODEL` for your AI provider:
+
+| Provider      | `AI_BASE_URL`                                             | `AI_MODEL`, for example | API key                                                           |
+| ------------- | --------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------- |
+| OpenAI        | `https://api.openai.com/v1`                               | `gpt-5.4-mini`          | [platform.openai.com](https://platform.openai.com/api-keys)       |
+| Anthropic     | `https://api.anthropic.com/v1`                            | `claude-sonnet-5-5`     | [platform.claude.com](https://platform.claude.com/settings/keys)  |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.5-flash`      | [aistudio.google.com](https://aistudio.google.com/apikey)         |
+
+Load the file. Do this in each new terminal, and each time you change `.env`:
 
 ```bash
 set -a
@@ -54,19 +62,19 @@ your own recording, replace the URL.
 ## What happens
 
 The script imports the recording with the Ingest API and waits for the
-transcript. Then it sends the transcript to Claude, one sentence on each line.
-Claude gives the first and last words of five moments. The script finds these
-words in the transcript. It makes sure that each moment is 15 to 60 seconds
-long and does not overlap another moment. It asks Claude one more time to fix
-the moments that fail. It saves the moments in `moments.json`.
+transcript. Then it sends the transcript to the AI model, one sentence on each
+line. The model gives the first and last words of five moments. The script
+finds these words in the transcript. It makes sure that each moment is 15 to 60
+seconds long and does not overlap another moment. It asks the model one more
+time to fix the moments that fail. It saves the moments in `moments.json`.
 
-Each clip uses two renders. The first render cuts the moment and puts it in a
-1080x1920 frame. The second render adds the title and captions from the audio
-of the cut. The script downloads each clip to `clip-MMmSSs.mp4`, named by its
-start time in the recording.
+For each moment, the script cuts the transcript lines into a caption file and
+uploads it. One render cuts the moment from the recording, puts it in a
+1080x1920 frame, and adds the title and the captions. The script downloads each
+clip to `clip-MMmSSs.mp4`, named by its start time in the recording.
 
 With the demo recording, which is 52 minutes long, the import takes about 4
-minutes. Each clip takes 2 to 4 minutes, and the clips render at the same time.
+minutes. Each clip takes about 2 minutes, and the clips render at the same time.
 
 The script saves its progress in `manifest.json`. Run the same command again
 to continue after a stop. It does not import the recording or pick the

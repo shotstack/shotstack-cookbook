@@ -4,9 +4,9 @@
     python clips.py RECORDING_URL [--limit N] [--repick]
 
 Step 1 imports the recording with Shotstack's Ingest API and gets its transcript.
-Step 2 asks Claude to pick the best moments and saves them to moments.json.
-Step 3 renders each moment twice: once to cut it out and fit it into a vertical
-frame, and once to add captions generated from the cut's own audio.
+Step 2 asks an AI model to pick the best moments and saves them to moments.json.
+Step 3 renders each moment once: it cuts the moment out of the recording, fits it
+into a vertical frame, and adds a title and captions made from the transcript.
 Step 4 does that for every moment and downloads the finished clips.
 
 Everything for one recording goes in clips/<name>/. Progress is saved to
@@ -15,8 +15,10 @@ picks up where the last run stopped instead of repeating work.
 
 Environment variables:
     SHOTSTACK_API_KEY   your Shotstack API key
-    ANTHROPIC_API_KEY   your Anthropic API key (only needed to pick moments)
     SHOTSTACK_ENV       "v1" for production (the default) or "stage" for the sandbox
+    AI_BASE_URL         the OpenAI-compatible API of your AI provider
+    AI_API_KEY          your API key for that provider
+    AI_MODEL            the model that picks the moments
 """
 
 import argparse
@@ -39,16 +41,19 @@ HEADERS = {
     "x-api-key": os.environ.get("SHOTSTACK_API_KEY", ""),
     "Accept": "application/json",
 }
+AI_BASE_URL = os.environ.get("AI_BASE_URL", "").rstrip("/")
+AI_API_KEY = os.environ.get("AI_API_KEY", "")
+AI_MODEL = os.environ.get("AI_MODEL", "")
 
 CLIP_COUNT = 5
 MIN_SECONDS, MAX_SECONDS = 15, 60
 
 POLL_SECONDS = 10
+UPLOAD_POLL_SECONDS = 2
 IMPORT_TIMEOUT = 60 * 60  # stop waiting for the import and transcript after an hour
 RENDER_TIMEOUT = 60 * 60  # and for the renders
-# A render's URL can be deleted after 24 hours. A cut older than this is rendered
-# again before its captions are.
-CUT_MAX_AGE = 20 * 60 * 60
+UPLOAD_TIMEOUT = 2 * 60  # and for a caption file to be ready
+AI_TIMEOUT = 5 * 60  # one request to the AI model
 
 
 def fail(message):
@@ -99,16 +104,21 @@ class Unresolved(Exception):
 
 
 def error_detail(body):
-    """The reason in an error body: Ingest sends errors[0].detail, Edit sends
-    response.error or message."""
+    """The reason in an error body. Shotstack's Ingest API sends errors[0].detail,
+    its Edit API sends response.error or message, and OpenAI-compatible APIs send
+    error.message."""
+    if isinstance(body, list) and body:
+        body = body[0]
     if not isinstance(body, dict):
         return ""
     errors = body.get("errors")
     first = errors[0] if isinstance(errors, list) and errors else None
     response = body.get("response")
+    error = body.get("error")
     for value in (
         first.get("detail") if isinstance(first, dict) else None,
         response.get("error") if isinstance(response, dict) else None,
+        error.get("message") if isinstance(error, dict) else error,
         body.get("message"),
     ):
         if isinstance(value, str) and value:
@@ -158,6 +168,37 @@ def get_json(url):
             pass
         time.sleep(5 * attempt)
     fail(f"GET {url} kept failing. Run the same command again to carry on.")
+
+
+def upload_text(text):
+    """Upload a small text file with the Ingest API and return its URL. An upload
+    doesn't cost anything, so a failed one is sent again on the next run."""
+    try:
+        data = post_json(f"{INGEST}/upload", {}).get("data")
+    except Unresolved as error:
+        raise ApiError(f"the upload request didn't complete ({error})") from error
+    attributes = data.get("attributes") if isinstance(data, dict) else None
+    if not isinstance(attributes, dict) or not attributes.get("url"):
+        raise ApiError("the upload reply had no upload URL")
+    # The upload URL has no file name, so the content type tells Shotstack the type.
+    requests.put(
+        attributes["url"],
+        data=text.encode("utf-8"),
+        headers={"Content-Type": "text/plain"},
+        timeout=60,
+    ).raise_for_status()
+    started = time.time()
+    while time.time() - started < UPLOAD_TIMEOUT:
+        source = get_json(f"{INGEST}/sources/{data['id']}")["data"]["attributes"]
+        if source.get("status") == "ready":
+            return source["source"]
+        if source.get("status") == "failed":
+            reason = source.get("error") or "no reason given"
+            raise ApiError(f"Shotstack couldn't read the caption file ({reason})")
+        time.sleep(UPLOAD_POLL_SECONDS)
+    raise ApiError(
+        f"the caption file wasn't ready after {UPLOAD_TIMEOUT // 60} minutes"
+    )
 
 
 def download(url, path):
@@ -261,12 +302,6 @@ def parse_srt(text):
 
 # ---------------------------------------- step 2: pick the moments
 
-MODEL = "claude-sonnet-5-5"
-MAX_TOKENS = 1000
-# Sonnet 5.5 can't turn thinking off. "between_tools" is its lowest setting: no
-# thinking before it answers, and this request has no tools to think between.
-THINKING = {"type": "between_tools"}
-
 PROMPT = f"""\
 You pick moments from a talk transcript to turn into short vertical video clips.
 
@@ -284,28 +319,10 @@ introductions and housekeeping.
 
 For each moment, copy the first six to ten words of its first sentence and the last
 six to ten words of its last sentence exactly as they appear in the transcript, and
-give it a short title of at most eight words. List the moments from best to worst."""
+give it a short title of at most eight words. List the moments from best to worst.
 
-MOMENTS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "moments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "first_words": {"type": "string"},
-                    "last_words": {"type": "string"},
-                    "title": {"type": "string"},
-                },
-                "required": ["first_words", "last_words", "title"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    "required": ["moments"],
-    "additionalProperties": False,
-}
+Reply with JSON only, in this form:
+{{"moments": [{{"first_words": "...", "last_words": "...", "title": "..."}}]}}"""
 
 
 def sentences(cues):
@@ -347,26 +364,63 @@ def find(target, stream, after=0):
             yield stream[k][1], stream[k + len(target) - 1][1]
 
 
-def ask_claude(client, messages):
-    """One request to Claude. Structured outputs make the reply JSON that matches
-    the schema."""
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        thinking=THINKING,
-        system=PROMPT,
-        messages=messages,
-        output_config={"format": {"type": "json_schema", "schema": MOMENTS_SCHEMA}},
-    )
-    if response.stop_reason != "end_turn":
-        fail(
-            f"Claude stopped early ({response.stop_reason}), "
-            "so its reply isn't complete."
+def ask_ai(messages):
+    """One request to the AI model through the OpenAI-compatible chat API, which
+    OpenAI, Anthropic, Google Gemini and many other providers offer. Returns the
+    text of the reply."""
+    url = f"{AI_BASE_URL}/chat/completions"
+    try:
+        response = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {AI_API_KEY}"},
+            json={"model": AI_MODEL, "messages": messages},
+            timeout=AI_TIMEOUT,
         )
-    text = next((b.text for b in response.content if b.type == "text"), None)
-    if text is None:
-        fail("Claude's reply has no text.")
-    return json.loads(text)["moments"]
+    except requests.RequestException as error:
+        fail(
+            f"could not reach {url} ({type(error).__name__}). "
+            "Check AI_BASE_URL and your network."
+        )
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    if response.status_code in (401, 403):
+        fail(
+            f"the AI provider refused AI_API_KEY ({response.status_code} "
+            f"{error_detail(body)})."
+        )
+    if response.status_code >= 400:
+        reason = error_detail(body) or response.reason
+        fail(
+            f"the AI provider answered {response.status_code} ({reason}). "
+            "Check AI_BASE_URL and AI_MODEL."
+        )
+    try:
+        choice = body["choices"][0]
+        text = choice["message"]["content"]
+    except (TypeError, KeyError, IndexError):
+        fail(f"{url} didn't send a chat reply. Check AI_BASE_URL.")
+    if choice.get("finish_reason") == "length":
+        fail("the AI model's reply was cut off. Try another AI_MODEL.")
+    return text or ""
+
+
+def read_reply(reply):
+    """The moments in the AI model's reply, or None if it isn't the JSON asked for.
+    Some models put the JSON in a code block, so this reads from the first { to the
+    last }."""
+    try:
+        picks = json.loads(reply[reply.find("{") : reply.rfind("}") + 1])["moments"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    fields = ("first_words", "last_words", "title")
+    if not isinstance(picks, list) or not all(
+        isinstance(p, dict) and all(isinstance(p.get(f), str) for f in fields)
+        for p in picks
+    ):
+        return None
+    return picks
 
 
 def check_picks(picks, lines, duration):
@@ -418,24 +472,38 @@ def check_picks(picks, lines, duration):
     return moments[:CLIP_COUNT], problems
 
 
-def pick_moments(client, lines, duration):
-    """Ask Claude for moments, and ask once more if too few of them pass the checks."""
-    messages = [{"role": "user", "content": transcript_text(lines)}]
-    picks = ask_claude(client, messages)
-    moments, problems = check_picks(picks, lines, duration)
+def check_reply(reply, lines, duration):
+    picks = read_reply(reply)
+    if picks is None:
+        return [], ["the reply isn't the JSON that was asked for"]
+    return check_picks(picks, lines, duration)
+
+
+def pick_moments(lines, duration):
+    """Ask the AI model for moments, and ask once more if too few of them pass the
+    checks."""
+    messages = [
+        {"role": "system", "content": PROMPT},
+        {"role": "user", "content": transcript_text(lines)},
+    ]
+    reply = ask_ai(messages)
+    moments, problems = check_reply(reply, lines, duration)
     if len(moments) < CLIP_COUNT:
-        print("Asking Claude to fix these:" + "".join(f"\n  - {p}" for p in problems))
+        print(
+            "Asking the AI model to fix these:"
+            + "".join(f"\n  - {p}" for p in problems)
+        )
         messages += [
-            {"role": "assistant", "content": json.dumps({"moments": picks})},
+            {"role": "assistant", "content": reply},
             {
                 "role": "user",
                 "content": "Some of those moments break the rules:\n"
                 + "\n".join(f"- {p}" for p in problems)
                 + f"\nSend the full list of {CLIP_COUNT} moments again, "
-                "with these fixed.",
+                "with these fixed, as JSON only.",
             },
         ]
-        retried = check_picks(ask_claude(client, messages), lines, duration)
+        retried = check_reply(ask_ai(messages), lines, duration)
         if len(retried[0]) > len(moments):  # keep the first answer if it was better
             moments, problems = retried
     return moments, problems
@@ -482,16 +550,7 @@ def get_moments(lines, manifest, folder, repick):
     with a different picker, and the renders use it as it is."""
     path = folder / "moments.json"
     picked_with = hashlib.sha256(
-        json.dumps(
-            [
-                transcript_text(lines),
-                MODEL,
-                MAX_TOKENS,
-                THINKING,
-                PROMPT,
-                MOMENTS_SCHEMA,
-            ]
-        ).encode()
+        json.dumps([transcript_text(lines), AI_BASE_URL, AI_MODEL, PROMPT]).encode()
     ).hexdigest()[:16]
     if (
         path.exists()
@@ -501,28 +560,18 @@ def get_moments(lines, manifest, folder, repick):
         print(f"Using the moments in {path}")
         return read_moments(path, manifest["duration"])
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        fail("set ANTHROPIC_API_KEY so Claude can pick the moments.")
-    try:
-        import anthropic  # only this step needs it
-    except ImportError:
-        fail("install the anthropic package (pip install -r requirements.txt).")
-    print(f"Asking {MODEL} for {CLIP_COUNT} moments from {len(lines)} sentences")
-    try:
-        moments, problems = pick_moments(
-            anthropic.Anthropic(), lines, manifest["duration"]
+    if not (AI_BASE_URL and AI_API_KEY and AI_MODEL):
+        fail(
+            "set AI_BASE_URL, AI_API_KEY and AI_MODEL so an AI model can pick the "
+            "moments. The README gives the values for common providers."
         )
-    except anthropic.AuthenticationError:
-        fail("Anthropic refused the API key. Check ANTHROPIC_API_KEY.")
-    except anthropic.APIConnectionError:
-        fail("could not reach the Claude API. Check your network and run again.")
-    except anthropic.APIError as error:
-        fail(f"the Claude API returned an error: {error}")
+    print(f"Asking {AI_MODEL} for {CLIP_COUNT} moments from {len(lines)} sentences")
+    moments, problems = pick_moments(lines, manifest["duration"])
     for problem in problems:
         print(f"  left out: {problem}")
     if not moments:
         fail(
-            "none of the moments passed the checks. Run again to ask Claude again, "
+            "none of the moments passed the checks. Run again to ask again, "
             f"or write {path} by hand."
         )
     path.write_text(json.dumps(moments, indent=2))
@@ -542,31 +591,23 @@ def get_moments(lines, manifest, folder, repick):
 # ---------------------------------------- step 3: render one clip
 
 
-def cut_edit(source_url, moment):
-    """Render 1: cut the moment out of the recording and fit it into a vertical
-    frame."""
-    return {
-        "timeline": {
-            "background": "#000000",
-            "tracks": [
-                {
-                    "clips": [
-                        {
-                            "asset": {
-                                "type": "video",
-                                "src": source_url,
-                                "trim": moment["start"],
-                            },
-                            "start": 0,
-                            "length": round(moment["end"] - moment["start"], 3),
-                            "fit": "contain",
-                        }
-                    ]
-                },
-            ],
-        },
-        "output": {"format": "mp4", "size": {"width": 1080, "height": 1920}},
-    }
+def clip_srt(cues, moment):
+    """The transcript's cues inside one moment, as an SRT file timed from the start
+    of the clip. The captions come from this file, so nothing is transcribed again."""
+
+    def stamp(seconds):
+        """62.5 -> '00:01:02,500'"""
+        minutes, ms = divmod(round(seconds * 1000), 60000)
+        return (
+            f"{minutes // 60:02d}:{minutes % 60:02d}:{ms // 1000:02d},{ms % 1000:03d}"
+        )
+
+    inside = [c for c in cues if c.end > moment["start"] and c.start < moment["end"]]
+    return "\n".join(
+        f"{n}\n{stamp(max(c.start - moment['start'], 0))} --> "
+        f"{stamp(min(c.end, moment['end']) - moment['start'])}\n{c.text}\n"
+        for n, c in enumerate(inside, 1)
+    )
 
 
 # Roboto, a variable font, loaded so the bold weights below apply. A loaded font
@@ -576,12 +617,10 @@ ROBOTO_URL = "https://fonts.gstatic.com/s/roboto/v50/KFOmCnqEu92Fr1Me5WZLCzYlKw.
 ROBOTO = "KFOmCnqEu92Fr1Me5WZLCzYlKw"
 
 
-def caption_edit(cut_url, title):
-    """Render 2: add a title and captions generated from the cut's own audio.
-
-    The title sits in the black band above the video. The captions come from the
-    clip named "clip" through an alias. They sit in the band under the video, with
-    the word being spoken in yellow."""
+def clip_edit(source_url, moment, captions_url):
+    """The one render for one clip. It cuts the moment out of the recording and fits
+    it into a vertical frame. The title sits in the black band above the video, and
+    the captions sit in the band under it, with the word being spoken in yellow."""
     return {
         "timeline": {
             "background": "#000000",
@@ -592,7 +631,7 @@ def caption_edit(cut_url, title):
                         {
                             "asset": {
                                 "type": "rich-text",
-                                "text": title,
+                                "text": moment["title"],
                                 "font": {
                                     "family": ROBOTO,
                                     "size": 76,
@@ -615,7 +654,7 @@ def caption_edit(cut_url, title):
                         {
                             "asset": {
                                 "type": "rich-caption",
-                                "src": "alias://clip",
+                                "src": captions_url,
                                 "font": {
                                     "family": ROBOTO,
                                     "size": 64,
@@ -636,10 +675,14 @@ def caption_edit(cut_url, title):
                 {
                     "clips": [
                         {
-                            "alias": "clip",
-                            "asset": {"type": "video", "src": cut_url},
+                            "asset": {
+                                "type": "video",
+                                "src": source_url,
+                                "trim": moment["start"],
+                            },
                             "start": 0,
-                            "length": "auto",
+                            "length": round(moment["end"] - moment["start"], 3),
+                            "fit": "contain",
                         }
                     ]
                 },
@@ -677,29 +720,27 @@ def finished(render, label):
     return render["status"] == "done"
 
 
-def advance(job, moment, source_url, path, label):
-    """Take one clip a step further: cut and reframe, then captions, then download."""
-    if "cut" not in job:
-        job["cut"] = submit(cut_edit(source_url, moment), f"{label} cut")
+def advance(job, moment, source_url, cues, path, label):
+    """Take one clip a step further: upload its captions and render it, then
+    download it."""
+    if "render" not in job:
+        if "captions" not in job:
+            srt = clip_srt(cues, moment)
+            if not srt:
+                fail(f"{label} has no words in the transcript. Edit moments.json.")
+            job["captions"] = upload_text(srt)
+        job["render"] = submit(clip_edit(source_url, moment, job["captions"]), label)
         return
-    if not finished(job["cut"], f"{label} cut"):
-        return
-    if "captions" not in job:
-        # Render URLs can be deleted after 24 hours, so caption each cut as soon as
-        # it's ready.
-        job["captions"] = submit(
-            caption_edit(job["cut"]["url"], moment["title"]), f"{label} captions"
-        )
-        return
-    if not finished(job["captions"], f"{label} captions"):
+    if not finished(job["render"], label):
         return
     try:
-        # This URL can be deleted after 24 hours too
-        download(job["captions"]["url"], path)
+        # Render URLs can be deleted after 24 hours, so each clip is downloaded as
+        # soon as it's done.
+        download(job["render"]["url"], path)
     except requests.HTTPError as error:
         status = getattr(error.response, "status_code", None)
         if status in (403, 404, 410):
-            del job["captions"]  # so the next run renders the captions again
+            del job["render"]  # the file is gone, so the next run renders it again
             job["error"] = f"the rendered file is gone (HTTP {status})"
             return
         raise
@@ -715,33 +756,23 @@ def clip_state(job):
         return "done"
     if "unresolved" in job:
         return "unresolved"
-    if "error" in job or "failed" in (
-        job.get("cut", {}).get("status"),
-        job.get("captions", {}).get("status"),
-    ):
+    if "error" in job or job.get("render", {}).get("status") == "failed":
         return "failed"
     return "working"
 
 
-def render_clips(moments, manifest, folder):
-    """Submit every clip's renders and poll until each clip is done or has failed.
+def render_clips(moments, cues, manifest, folder):
+    """Submit every clip's render and poll until each clip is done or has failed.
 
-    Each clip is two render requests, tracked by ID."""
+    Each clip is one render request, tracked by ID."""
     jobs = manifest.setdefault("renders", {})
     todo = []
     for n, moment in enumerate(moments, 1):
         job = jobs.setdefault(f"{moment['start']:.3f}-{moment['end']:.3f}", {})
         if clip_state(job) == "failed":  # a new run tries failed clips again
             job.pop("error", None)
-            cut = job.get("cut", {})
-            redo_captions = job.get("captions", {}).get("status") in (None, "failed")
-            # The captions render reads the cut's URL, so an old cut is made again
-            cut_is_old = time.time() - cut.get("submitted", 0) > CUT_MAX_AGE
-            if cut.get("status") == "failed" or (redo_captions and cut_is_old):
-                job.pop("cut", None)
-                job.pop("captions", None)
-            elif redo_captions:
-                job.pop("captions", None)
+            if job.get("render", {}).get("status") == "failed":
+                del job["render"]
         minutes, seconds = divmod(int(moment["start"]), 60)
         todo.append((n, moment, job, folder / f"clip-{minutes:02d}m{seconds:02d}s.mp4"))
     manifest.save()
@@ -753,7 +784,7 @@ def render_clips(moments, manifest, folder):
             if clip_state(job) != "working":
                 continue
             try:
-                advance(job, moment, manifest["source_url"], path, f"clip {n}")
+                advance(job, moment, manifest["source_url"], cues, path, f"clip {n}")
             except Unresolved as error:
                 # Don't resubmit: the render may have started, and a retry could
                 # duplicate it.
@@ -786,9 +817,7 @@ def report(todo):
                 '"renders" in manifest.json and run again.'
             )
         else:
-            reasons = [job.get("error")] + [
-                job.get(stage, {}).get("error") for stage in ("cut", "captions")
-            ]
+            reasons = [job.get("error"), job.get("render", {}).get("error")]
             reason = "; ".join(r for r in reasons if r)
             print(
                 f"  {n}. {moment['title']} ({where}): failed ({reason}). "
@@ -811,7 +840,7 @@ def main():
     parser.add_argument(
         "--repick",
         action="store_true",
-        help="ask Claude for new moments even if moments.json is up to date",
+        help="ask the AI model for new moments even if moments.json is up to date",
     )
     args = parser.parse_args()
 
@@ -835,11 +864,9 @@ def main():
     try:
         if "source_url" not in manifest:
             import_recording(args.url, manifest, folder)
-        lines = sentences(
-            parse_srt((folder / "transcript.srt").read_text(encoding="utf-8"))
-        )
-        moments = get_moments(lines, manifest, folder, args.repick)
-        todo = render_clips(moments[: args.limit], manifest, folder)
+        cues = parse_srt((folder / "transcript.srt").read_text(encoding="utf-8"))
+        moments = get_moments(sentences(cues), manifest, folder, args.repick)
+        todo = render_clips(moments[: args.limit], cues, manifest, folder)
     except Unresolved as error:
         fail(
             f"a request didn't complete ({error}). Check your network. The request "
