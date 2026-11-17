@@ -1,0 +1,13 @@
+node_modules/
+.env
+
+# Downloaded media. The Mixkit license does not allow sharing these files.
+footage.mp4
+music.mp3
+
+# Files that the scripts write
+assets.json
+template.json
+template-id.txt
+render-results.json
+videos/
