@@ -12,17 +12,17 @@ async function main() {
   const assets = JSON.parse(readStep('assets.json', 'setup-assets.js'));
 
   const template = buildTemplate({ lottie, assets });
-  fs.writeFileSync(
-    path.join(__dirname, 'template.json'),
-    JSON.stringify(template, null, 2)
-  );
-
   const { response } = await api('POST', `${EDIT_API}/templates`, {
     name: 'Product card',
     template
   });
   if (!response?.id)
     throw new Error('The API saved the template but returned no id.');
+  // Written only after the API has the template, because render-videos.js resumes from it.
+  fs.writeFileSync(
+    path.join(__dirname, 'template.json'),
+    JSON.stringify(template, null, 2)
+  );
   fs.writeFileSync(path.join(__dirname, 'template-id.txt'), response.id);
   console.log(`Fields: ${fieldNames(lottie).join(', ')}`);
   console.log(

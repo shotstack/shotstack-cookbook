@@ -26,14 +26,15 @@ async function main() {
   }
 
   const template = buildTemplate({ lottie, assets });
-  fs.writeFileSync(
-    path.join(__dirname, 'template.json'),
-    JSON.stringify(template, null, 2)
-  );
   await api('PUT', `${EDIT_API}/templates/${id}`, {
     name: 'Product card',
     template
   });
+  // Written only after the API has the new design, because render-videos.js resumes from it.
+  fs.writeFileSync(
+    path.join(__dirname, 'template.json'),
+    JSON.stringify(template, null, 2)
+  );
   console.log(`Template ${id} updated from ${path.basename(exportFile)}.`);
 }
 

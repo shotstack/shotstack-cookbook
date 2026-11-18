@@ -26,7 +26,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Calls the API and returns the parsed JSON.
 // Retries after a 429 (too many requests). Reads and updates also retry after a dropped
-// connection or a server error. Create and render requests (POST) don't, so they're never sent twice.
+// connection or a server error. Create and render requests (POST) don't, so one run never sends them twice.
 async function api(method, url, body) {
   for (let attempt = 1; ; attempt++) {
     let res;
@@ -78,8 +78,11 @@ async function api(method, url, body) {
       const err = JSON.parse(text);
       detail = err.errors?.[0]?.detail || err.response?.error || err.message;
     } catch {}
-    throw new Error(
-      `${method} ${url} returned ${res.status}: ${String(detail || text).slice(0, 300)}`
+    throw Object.assign(
+      new Error(
+        `${method} ${url} returned ${res.status}: ${String(detail || text).slice(0, 300)}`
+      ),
+      { status: res.status }
     );
   }
 }
@@ -103,7 +106,14 @@ async function download(url, file) {
   const res = await fetch(url, {
     signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
   }).catch(() => null);
-  if (!res?.ok) throw new Error('The download failed. Run the script again.');
+  if (!res?.ok) {
+    throw Object.assign(
+      new Error('The download failed. Run the script again.'),
+      {
+        status: res?.status
+      }
+    );
+  }
   fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
 }
 

@@ -28,21 +28,28 @@ function sampleText(lottie) {
 
 // The html5 clip that plays the card. Merge placeholders sit in hidden divs in the html;
 // the script copies their text into the matching text layers before the animation starts.
-function cardClip(lottie, fontFile) {
+function cardClip(lottie, fontDir) {
   const fields = fieldNames(lottie);
-  const font = lottie.fonts?.list?.[0];
-  if (!font) {
+  const fonts = lottie.fonts?.list || [];
+  if (!fonts.length) {
     throw new Error(
       'The export lists no font. Export it again from Bodymovin with Glyphs off.'
     );
   }
-  if (!fs.existsSync(fontFile)) {
-    throw new Error(
-      `Can't find ${path.basename(fontFile)} next to the scripts.`
-    );
-  }
-  const weight = /bold/i.test(font.fStyle) ? 700 : 400;
-  const fontBase64 = fs.readFileSync(fontFile).toString('base64');
+  // Each font comes from a file named after it in the export: Montserrat-Bold -> montserrat-bold.woff2.
+  const faces = fonts.map(font => {
+    const file = path.join(fontDir, `${font.fName.toLowerCase()}.woff2`);
+    if (!fs.existsSync(file)) {
+      throw new Error(
+        `Can't find ${path.basename(file)}, the font file for ${font.fName}, next to the scripts.`
+      );
+    }
+    return {
+      family: font.fFamily,
+      weight: /bold/i.test(font.fStyle) ? 700 : 400,
+      data: fs.readFileSync(file).toString('base64')
+    };
+  });
 
   const html = ['<div id="card"></div>']
     .concat(
@@ -51,7 +58,10 @@ function cardClip(lottie, fontFile) {
     .join('\n');
 
   const css = [
-    `@font-face { font-family: '${font.fFamily}'; font-weight: ${weight}; src: url(data:font/woff2;base64,${fontBase64}) format('woff2'); }`,
+    ...faces.map(
+      face =>
+        `@font-face { font-family: '${face.family}'; font-weight: ${face.weight}; src: url(data:font/woff2;base64,${face.data}) format('woff2'); }`
+    ),
     `html, body { margin: 0; width: ${lottie.w}px; height: ${lottie.h}px; overflow: hidden; background: transparent; }`,
     `#card { width: ${lottie.w}px; height: ${lottie.h}px; }`
   ].join('\n');
@@ -95,8 +105,17 @@ function start() {
   else anim.addEventListener('DOMLoaded', () => shrinkToFit(anim.renderer.elements));
 }
 
-// lottie-web lays text out from the font's measurements, so start once the font has loaded.
-document.fonts.load('${weight} 40px "${font.fFamily}"').then(start, start);`;
+// lottie-web lays text out from the font's measurements, so start once the fonts have loaded.
+const fonts = ${JSON.stringify(faces.map(face => `${face.weight} 40px "${face.family}"`))};
+Promise.all(fonts.map((font) => document.fonts.load(font))).then(start, start);`;
+
+  for (const [field, value] of Object.entries({ css, js })) {
+    if (value.length > 500000) {
+      throw new Error(
+        `The html5 ${field} is ${value.length} characters, over the limit of 500,000. Use a smaller font file or a simpler animation.`
+      );
+    }
+  }
 
   return {
     asset: { type: 'html5', html, css, js },
@@ -109,12 +128,8 @@ document.fonts.load('${weight} 40px "${font.fFamily}"').then(start, start);`;
 }
 
 // The full template: card on top, logo in the top-right corner, footage underneath, music on its own track.
-function buildTemplate({
-  lottie,
-  assets,
-  fontFile = path.join(__dirname, 'montserrat-bold.woff2')
-}) {
-  const card = cardClip(lottie, fontFile);
+function buildTemplate({ lottie, assets, fontDir = __dirname }) {
+  const card = cardClip(lottie, fontDir);
   const cardStart = 0.5;
   const total = cardStart + card.length + 0.5;
   const defaults = sampleText(lottie);

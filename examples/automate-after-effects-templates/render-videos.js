@@ -1,6 +1,7 @@
 // Renders one video per row of data.csv from the saved template, and downloads each one.
 // Run it again after a failure: rows already downloaded are skipped, and renders that were
-// sent but not downloaded are picked up again instead of being paid for twice.
+// sent but not downloaded are picked up again instead of being rendered twice. A render
+// request that got no answer is sent again, so it can render twice if Shotstack did get it.
 // Usage: node render-videos.js [data.csv]
 const crypto = require('crypto');
 const fs = require('fs');
@@ -14,11 +15,12 @@ const {
   sleep
 } = require('./shotstack');
 
-// A safety limit, not a guarantee: the card shrinks long text, but very long values still won't fit.
+// The fields come from the saved template, so a new text layer only needs a new CSV column.
+// These limits are a safety net, not a guarantee: the card shrinks long text, but very long values still won't fit.
 const MAX_LENGTH = { PRODUCT: 60, PRICE: 10 };
 
 // Reads a CSV file with a header row. Handles quoted values with commas and "" quotes.
-function readCsv(file) {
+function readCsv(file, fields) {
   const name = path.basename(file);
   if (!fs.existsSync(file)) throw new Error(`Can't find ${name}.`);
   const rows = [];
@@ -34,7 +36,7 @@ function readCsv(file) {
         i++;
       } else if (char === '"') quoted = false;
       else value += char;
-    } else if (char === '"') quoted = true;
+    } else if (char === '"' && value === '') quoted = true;
     else if (char === ',') {
       row.push(value);
       value = '';
@@ -55,12 +57,9 @@ function readCsv(file) {
     r.some(cell => cell.trim() !== '')
   );
   const columns = (header || []).map(cell => cell.trim());
-  const missing = Object.keys(MAX_LENGTH).filter(
-    field => !columns.includes(field)
-  );
-  if (missing.length)
+  if (fields.some(field => !columns.includes(field)))
     throw new Error(
-      `${name} needs a header row with the columns ${Object.keys(MAX_LENGTH).join(', ')}.`
+      `${name} needs a header row with the columns ${fields.join(', ')}.`
     );
   return data.map(cells =>
     Object.fromEntries(columns.map((col, i) => [col, (cells[i] || '').trim()]))
@@ -75,9 +74,10 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;');
 }
 
-function problemsWith(row) {
+function problemsWith(row, fields) {
   const problems = [];
-  for (const [field, max] of Object.entries(MAX_LENGTH)) {
+  for (const field of fields) {
+    const max = MAX_LENGTH[field] ?? Infinity;
     if (!row[field]) problems.push(`${field} is empty`);
     else if (row[field].length > max)
       problems.push(
@@ -98,10 +98,14 @@ function slug(text) {
 }
 
 async function main() {
-  const rows = readCsv(path.join(__dirname, process.argv[2] || 'data.csv'));
   const id = readStep('template-id.txt', 'create-template.js').trim();
-  // The key below includes the template, so a design update renders every row again.
+  // The key below includes the API, the template id and the design, so a design update renders every row again.
   const templateJson = readStep('template.json', 'create-template.js');
+  const fields = JSON.parse(templateJson).merge.map(m => m.find);
+  const rows = readCsv(
+    path.join(__dirname, process.argv[2] || 'data.csv'),
+    fields
+  );
   fs.mkdirSync(path.join(__dirname, 'videos'), { recursive: true });
 
   // Results of earlier runs, keyed by template + values, so a new run can resume them.
@@ -127,13 +131,13 @@ async function main() {
   // Send one render request per row, about one per second.
   for (const [index, row] of rows.entries()) {
     const name = `${String(index + 1).padStart(2, '0')}-${slug(row.PRODUCT || 'row')}`;
-    const merge = Object.keys(MAX_LENGTH).map(field => ({
+    const merge = fields.map(field => ({
       find: field,
       replace: escapeHtml(row[field] || '')
     }));
     const key = crypto
       .createHash('sha1')
-      .update(templateJson + JSON.stringify(merge))
+      .update(EDIT_API + id + templateJson + JSON.stringify(merge))
       .digest('hex');
     const before = results.get(key);
     if (
@@ -152,7 +156,7 @@ async function main() {
     const result = { key, name, row };
     results.set(key, result);
     current.push(result);
-    const problems = problemsWith(row);
+    const problems = problemsWith(row, fields);
     if (problems.length) {
       result.status = 'skipped';
       result.error = problems.join('; ');
@@ -193,11 +197,17 @@ async function main() {
           'The render finished without a video URL. Run the script again to check it.';
       }
       if (result.status === 'done') {
-        result.video = path.join('videos', `${result.name}.mp4`);
+        result.video = path.join(
+          'videos',
+          `${result.name}-${result.key.slice(0, 6)}.mp4`
+        );
         await download(render.url, path.join(__dirname, result.video));
       }
     } catch (err) {
-      result.status = 'unknown';
+      // 403 or 404: the render or its video is gone (another environment, or a deleted file),
+      // so the next run renders it again. A timeout or a dropped connection keeps the render id
+      // for the next run to check.
+      result.status = [403, 404].includes(err.status) ? 'failed' : 'unknown';
       result.video = null;
       result.error = err.message;
     }

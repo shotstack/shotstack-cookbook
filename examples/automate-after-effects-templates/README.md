@@ -24,18 +24,10 @@ Download the footage and the music. The Mixkit license does not let us include t
 
 You can use your own footage and music instead. Keep the same file names.
 
-Copy the environment file. Add your API key to `.env`:
+Set your API key. The `.env.example` file lists the variables that the scripts read.
 
 ```bash
-cp .env.example .env
-```
-
-Load the file into your shell. Do this in each new terminal:
-
-```bash
-set -a
-source .env
-set +a
+export SHOTSTACK_API_KEY="your_api_key"
 ```
 
 ## Run
@@ -66,3 +58,5 @@ node render-videos.js one-row.csv
 The script skips a row if a value is longer than the limit in `MAX_LENGTH`. If you run the script again, it does not render the rows that it downloaded before. It also gets the renders that it sent but did not download.
 
 The `after-effects` directory has the After Effects projects for both versions of the card. To change the design, export it again with Bodymovin. Turn off the Glyphs setting. Keep the names of the text layers `PRODUCT` and `PRICE`.
+
+To add a field, name a new text layer in capitals. Then add a column with the same name to the CSV file. Each font in the export needs a `.woff2` file next to the scripts, named after the font in lower case, for example `montserrat-bold.woff2`.
