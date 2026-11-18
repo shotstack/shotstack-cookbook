@@ -9,15 +9,9 @@ async function main() {
   const lottie = readExport(
     path.join(__dirname, process.argv[2] || 'product-card.json')
   );
-  const assets = JSON.parse(
-    readStep(__dirname, 'assets.json', 'setup-assets.js')
-  );
+  const assets = JSON.parse(readStep('assets.json', 'setup-assets.js'));
 
-  const template = buildTemplate({
-    lottie,
-    fontFile: path.join(__dirname, 'montserrat-bold.woff2'),
-    assets
-  });
+  const template = buildTemplate({ lottie, assets });
   fs.writeFileSync(
     path.join(__dirname, 'template.json'),
     JSON.stringify(template, null, 2)

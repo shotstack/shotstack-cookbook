@@ -25,7 +25,7 @@ function readCsv(file) {
   let row = [];
   let value = '';
   let quoted = false;
-  const text = fs.readFileSync(file, 'utf8').replace(/^﻿/, '');
+  const text = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     if (quoted) {
@@ -90,7 +90,7 @@ function problemsWith(row) {
 function slug(text) {
   return text
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
@@ -99,20 +99,12 @@ function slug(text) {
 
 async function main() {
   const rows = readCsv(path.join(__dirname, process.argv[2] || 'data.csv'));
-  const id = readStep(
-    __dirname,
-    'template-id.txt',
-    'create-template.js'
-  ).trim();
-  // A change to the template (a design update) means every row renders again.
-  const design = crypto
-    .createHash('sha1')
-    .update(readStep(__dirname, 'template.json', 'create-template.js'))
-    .digest('hex');
-  const videosDir = path.join(__dirname, 'videos');
-  fs.mkdirSync(videosDir, { recursive: true });
+  const id = readStep('template-id.txt', 'create-template.js').trim();
+  // The key below includes the template, so a design update renders every row again.
+  const templateJson = readStep('template.json', 'create-template.js');
+  fs.mkdirSync(path.join(__dirname, 'videos'), { recursive: true });
 
-  // Results of earlier runs, keyed by design + values, so a new run can resume them.
+  // Results of earlier runs, keyed by template + values, so a new run can resume them.
   const resultsFile = path.join(__dirname, 'render-results.json');
   let earlier = [];
   if (fs.existsSync(resultsFile)) {
@@ -141,8 +133,7 @@ async function main() {
     }));
     const key = crypto
       .createHash('sha1')
-      .update(design)
-      .update(JSON.stringify(merge))
+      .update(templateJson + JSON.stringify(merge))
       .digest('hex');
     const before = results.get(key);
     if (
@@ -158,16 +149,7 @@ async function main() {
       current.push(before);
       continue;
     }
-    const result = {
-      key,
-      name,
-      row,
-      id: null,
-      status: null,
-      url: null,
-      error: null,
-      video: null
-    };
+    const result = { key, name, row };
     results.set(key, result);
     current.push(result);
     const problems = problemsWith(row);

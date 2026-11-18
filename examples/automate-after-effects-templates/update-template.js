@@ -12,14 +12,8 @@ async function main() {
     process.argv[2] || 'product-card-v2.json'
   );
   const lottie = readExport(exportFile);
-  const assets = JSON.parse(
-    readStep(__dirname, 'assets.json', 'setup-assets.js')
-  );
-  const id = readStep(
-    __dirname,
-    'template-id.txt',
-    'create-template.js'
-  ).trim();
+  const assets = JSON.parse(readStep('assets.json', 'setup-assets.js'));
+  const id = readStep('template-id.txt', 'create-template.js').trim();
 
   // Check the new export still has every field the current template uses.
   const { response: current } = await api('GET', `${EDIT_API}/templates/${id}`);
@@ -31,11 +25,7 @@ async function main() {
     );
   }
 
-  const template = buildTemplate({
-    lottie,
-    fontFile: path.join(__dirname, 'montserrat-bold.woff2'),
-    assets
-  });
+  const template = buildTemplate({ lottie, assets });
   fs.writeFileSync(
     path.join(__dirname, 'template.json'),
     JSON.stringify(template, null, 2)

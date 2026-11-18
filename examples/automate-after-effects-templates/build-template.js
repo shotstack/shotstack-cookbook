@@ -5,28 +5,24 @@ const path = require('path');
 
 const MIN_FONT_SIZE = 24; // auto-shrink never goes below this size (px)
 
+// Every text layer in the export, including the ones inside precompositions.
+const textLayers = lottie =>
+  [lottie.layers, ...(lottie.assets || []).map(asset => asset.layers)]
+    .flat()
+    .filter(layer => layer?.ty === 5);
+
 // Text layers named in capitals (PRODUCT, PRICE) are the fields that change in each video.
 function fieldNames(lottie) {
-  const lists = [lottie.layers || []];
-  for (const asset of lottie.assets || [])
-    if (Array.isArray(asset.layers)) lists.push(asset.layers);
-  const names = lists
-    .flat()
-    .filter(layer => layer.ty === 5 && /^[A-Z][A-Z0-9_]*$/.test(layer.nm))
-    .map(layer => layer.nm);
+  const names = textLayers(lottie)
+    .map(layer => layer.nm)
+    .filter(name => /^[A-Z][A-Z0-9_]*$/.test(name));
   return [...new Set(names)];
 }
 
 // The sample text the designer typed in each field, used as the template's default merge values.
 function sampleText(lottie) {
-  const lists = [lottie.layers || []];
-  for (const asset of lottie.assets || [])
-    if (Array.isArray(asset.layers)) lists.push(asset.layers);
   const text = {};
-  for (const layer of lists.flat()) {
-    if (layer.ty === 5 && !(layer.nm in text))
-      text[layer.nm] = layer.t.d.k[0].s.t;
-  }
+  for (const layer of textLayers(lottie)) text[layer.nm] ??= layer.t.d.k[0].s.t;
   return text;
 }
 
@@ -113,7 +109,11 @@ document.fonts.load('${weight} 40px "${font.fFamily}"').then(start, start);`;
 }
 
 // The full template: card on top, logo in the top-right corner, footage underneath, music on its own track.
-function buildTemplate({ lottie, fontFile, assets }) {
+function buildTemplate({
+  lottie,
+  assets,
+  fontFile = path.join(__dirname, 'montserrat-bold.woff2')
+}) {
   const card = cardClip(lottie, fontFile);
   const cardStart = 0.5;
   const total = cardStart + card.length + 0.5;

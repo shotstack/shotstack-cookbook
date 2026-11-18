@@ -24,18 +24,6 @@ const RENDER_TIMEOUT_MS = 10 * 60 * 1000;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// Turns an API error body into one readable line.
-function errorText(text) {
-  try {
-    const body = JSON.parse(text);
-    return (
-      body.errors?.[0]?.detail || body.response?.error || body.message || text
-    );
-  } catch {
-    return text;
-  }
-}
-
 // Calls the API and returns the parsed JSON.
 // Retries after a 429 (too many requests). Reads and updates also retry after a dropped
 // connection or a server error. Create and render requests (POST) don't, so they're never sent twice.
@@ -85,8 +73,13 @@ async function api(method, url, body) {
       );
       continue;
     }
+    let detail = text;
+    try {
+      const err = JSON.parse(text);
+      detail = err.errors?.[0]?.detail || err.response?.error || err.message;
+    } catch {}
     throw new Error(
-      `${method} ${url} returned ${res.status}: ${errorText(text).slice(0, 300)}`
+      `${method} ${url} returned ${res.status}: ${String(detail || text).slice(0, 300)}`
     );
   }
 }
@@ -105,28 +98,18 @@ async function waitForRender(id) {
   );
 }
 
-// Saves a file from a URL, retrying a dropped connection.
+// Saves a file from a URL. If it fails, the next run of render-videos.js tries again.
 async function download(url, file) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
-      return;
-    } catch (err) {
-      if (attempt >= 3) {
-        throw new Error(`Downloading ${url} failed: ${err.message}`);
-      }
-      await sleep(2000 * attempt);
-    }
-  }
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
+  }).catch(() => null);
+  if (!res?.ok) throw new Error('The download failed. Run the script again.');
+  fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
 }
 
-// Reads a file an earlier step wrote, or says which step to run first.
-function readStep(dir, file, step) {
-  const full = path.join(dir, file);
+// Reads a file an earlier step wrote next to the scripts, or says which step to run first.
+function readStep(file, step) {
+  const full = path.join(__dirname, file);
   if (!fs.existsSync(full)) {
     throw new Error(`Can't find ${file}. Run node ${step} first.`);
   }
@@ -134,7 +117,6 @@ function readStep(dir, file, step) {
 }
 
 module.exports = {
-  ENV,
   EDIT_API,
   INGEST_API,
   api,
